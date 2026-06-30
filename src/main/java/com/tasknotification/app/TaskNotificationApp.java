@@ -10,16 +10,31 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
@@ -31,13 +46,14 @@ public class TaskNotificationApp extends Application {
     @Override
     public void start(Stage stage) {
         TableView<Task> taskTable = buildTaskTable();
+        HBox actions = buildActions(taskTable);
 
         Label title = new Label("Task Notification");
         title.getStyleClass().add("screen-title");
 
         statusLabel.getStyleClass().add("status-label");
 
-        VBox header = new VBox(6, title, statusLabel);
+        VBox header = new VBox(10, title, statusLabel, actions);
         header.setPadding(new Insets(16, 16, 10, 16));
 
         BorderPane root = new BorderPane();
@@ -96,6 +112,111 @@ public class TaskNotificationApp extends Application {
         return table;
     }
 
+    private HBox buildActions(TableView<Task> taskTable) {
+        Button addButton = new Button("Add Task");
+        addButton.setOnAction(event -> showAddTaskDialog());
+
+        Button editButton = new Button("Edit Task");
+        editButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
+        editButton.setOnAction(event -> showEditTaskDialog(taskTable.getSelectionModel().getSelectedItem()));
+
+        HBox actions = new HBox(8, addButton, editButton);
+        actions.getStyleClass().add("actions");
+        return actions;
+    }
+
+    private void showAddTaskDialog() {
+        Optional<TaskFormData> result = showTaskDialog("Add Task", null);
+        result.ifPresent(formData -> {
+            try {
+                taskRepository.add(
+                        formData.person(),
+                        formData.taskDescription(),
+                        formData.deadline(),
+                        formData.completed()
+                );
+                loadTasks();
+            } catch (SQLException exception) {
+                showError("Could not add the task.");
+            }
+        });
+    }
+
+    private void showEditTaskDialog(Task task) {
+        Optional<TaskFormData> result = showTaskDialog("Edit Task", task);
+        result.ifPresent(formData -> {
+            try {
+                taskRepository.update(new Task(
+                        task.id(),
+                        task.dateCreated(),
+                        formData.person(),
+                        formData.taskDescription(),
+                        formData.deadline(),
+                        formData.completed()
+                ));
+                loadTasks();
+            } catch (SQLException exception) {
+                showError("Could not update the task.");
+            }
+        });
+    }
+
+    private Optional<TaskFormData> showTaskDialog(String title, Task task) {
+        Dialog<TaskFormData> dialog = new Dialog<>();
+        dialog.setTitle(title);
+        dialog.setHeaderText(null);
+
+        ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        TextField personField = new TextField(task == null ? "" : task.person());
+        personField.setPromptText("Person");
+
+        TextArea taskDescriptionArea = new TextArea(task == null ? "" : task.taskDescription());
+        taskDescriptionArea.setPromptText("Task description");
+        taskDescriptionArea.setPrefRowCount(4);
+        taskDescriptionArea.setWrapText(true);
+
+        DatePicker deadlinePicker = new DatePicker(task == null ? null : toLocalDate(task.deadline()));
+
+        CheckBox completedCheckBox = new CheckBox("Completed");
+        completedCheckBox.setSelected(task != null && task.completed());
+
+        GridPane form = new GridPane();
+        form.setHgap(10);
+        form.setVgap(10);
+        form.setPadding(new Insets(12));
+        form.addRow(0, new Label("Person"), personField);
+        form.addRow(1, new Label("Task"), taskDescriptionArea);
+        form.addRow(2, new Label("Deadline"), deadlinePicker);
+        form.addRow(3, new Label(""), completedCheckBox);
+
+        dialog.getDialogPane().setContent(form);
+
+        Button saveButton = (Button) dialog.getDialogPane().lookupButton(saveButtonType);
+        saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+            if (personField.getText().isBlank() || taskDescriptionArea.getText().isBlank()) {
+                showError("Person and task are required.");
+                event.consume();
+            }
+        });
+
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType != saveButtonType) {
+                return null;
+            }
+
+            return new TaskFormData(
+                    personField.getText().trim(),
+                    taskDescriptionArea.getText().trim(),
+                    toStartOfDay(deadlinePicker.getValue()),
+                    completedCheckBox.isSelected()
+            );
+        });
+
+        return dialog.showAndWait();
+    }
+
     private void loadTasks() {
         try {
             DatabaseInitializer.initialize();
@@ -114,7 +235,31 @@ public class TaskNotificationApp extends Application {
         return dateTime == null ? "" : DISPLAY_DATE_TIME.format(dateTime);
     }
 
+    private LocalDate toLocalDate(LocalDateTime dateTime) {
+        return dateTime == null ? null : dateTime.toLocalDate();
+    }
+
+    private LocalDateTime toStartOfDay(LocalDate date) {
+        return date == null ? null : LocalDateTime.of(date, LocalTime.MIDNIGHT);
+    }
+
+    private void showError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Task Notification");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
     public static void main(String[] args) {
         launch(args);
+    }
+
+    private record TaskFormData(
+            String person,
+            String taskDescription,
+            LocalDateTime deadline,
+            boolean completed
+    ) {
     }
 }

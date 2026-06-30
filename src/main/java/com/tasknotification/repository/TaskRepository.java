@@ -4,9 +4,11 @@ import com.tasknotification.database.DatabaseConnection;
 import com.tasknotification.model.Task;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -14,6 +16,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TaskRepository {
+    private final ConnectionFactory connectionFactory;
+
+    public TaskRepository() {
+        this(DatabaseConnection::getConnection);
+    }
+
+    public TaskRepository(ConnectionFactory connectionFactory) {
+        this.connectionFactory = connectionFactory;
+    }
+
     public List<Task> findAll() throws SQLException {
         String sql = """
                 SELECT id,
@@ -31,7 +43,7 @@ public class TaskRepository {
                 """;
 
         List<Task> tasks = new ArrayList<>();
-        try (Connection connection = DatabaseConnection.getConnection();
+        try (Connection connection = connectionFactory.getConnection();
              Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(sql)) {
             while (resultSet.next()) {
@@ -39,6 +51,60 @@ public class TaskRepository {
             }
         }
         return tasks;
+    }
+
+    public Task add(String person, String taskDescription, LocalDateTime deadline, boolean completed) throws SQLException {
+        String sql = """
+                INSERT INTO tasks (date_created, person, task_description, deadline, completed)
+                VALUES (?, ?, ?, ?, ?)
+                """;
+        LocalDateTime dateCreated = LocalDateTime.now().withNano(0);
+
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            statement.setString(1, formatDateTime(dateCreated));
+            statement.setString(2, person);
+            statement.setString(3, taskDescription);
+            setNullableDateTime(statement, 4, deadline);
+            statement.setInt(5, completed ? 1 : 0);
+            statement.executeUpdate();
+
+            try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    return new Task(
+                            generatedKeys.getLong(1),
+                            dateCreated,
+                            person,
+                            taskDescription,
+                            deadline,
+                            completed
+                    );
+                }
+            }
+        }
+
+        throw new SQLException("Creating task failed, no ID returned.");
+    }
+
+    public void update(Task task) throws SQLException {
+        String sql = """
+                UPDATE tasks
+                SET person = ?,
+                    task_description = ?,
+                    deadline = ?,
+                    completed = ?
+                WHERE id = ?
+                """;
+
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, task.person());
+            statement.setString(2, task.taskDescription());
+            setNullableDateTime(statement, 3, task.deadline());
+            statement.setInt(4, task.completed() ? 1 : 0);
+            statement.setLong(5, task.id());
+            statement.executeUpdate();
+        }
     }
 
     private Task mapTask(ResultSet resultSet) throws SQLException {
@@ -67,5 +133,18 @@ public class TaskRepository {
                 return null;
             }
         }
+    }
+
+    private void setNullableDateTime(PreparedStatement statement, int parameterIndex, LocalDateTime value) throws SQLException {
+        if (value == null) {
+            statement.setNull(parameterIndex, Types.VARCHAR);
+            return;
+        }
+
+        statement.setString(parameterIndex, formatDateTime(value));
+    }
+
+    private String formatDateTime(LocalDateTime value) {
+        return value == null ? null : value.withNano(0).toString();
     }
 }

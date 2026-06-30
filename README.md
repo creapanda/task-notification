@@ -26,6 +26,12 @@ mvn clean javafx:run
 
 On first launch, the app creates `database/tasks.db` and displays every row currently stored in the `tasks` table.
 
+## Test
+
+```bash
+mvn test
+```
+
 ## CI/CD
 
 GitHub Actions runs the Maven build on pushes and pull requests to `main`.
