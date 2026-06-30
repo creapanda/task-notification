@@ -4,7 +4,7 @@ A Java desktop application for viewing tasks stored in a local SQLite database.
 
 ## Current Status
 
-The Main window displays up to 3 unfinished tasks closest to their deadlines.
+The Main window is a compact view that displays up to 3 unfinished tasks closest to their deadlines.
 
 ## Planned Stack
 
