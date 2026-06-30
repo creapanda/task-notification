@@ -13,7 +13,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <javafx.version>22.0.2</javafx.version>
+        <javafx.version>24.0.2</javafx.version>
         <sqlite.version>3.46.1.0</sqlite.version>
         <junit.version>5.10.3</junit.version>
     </properties>
@@ -54,7 +54,7 @@
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
-                    <mainClass>com.tasknotification.app.TaskNotificationApp</mainClass>
+                    <mainClass>com.tasknotification.app.TaskNotificationLauncher</mainClass>
                 </configuration>
             </plugin>
             <plugin>
