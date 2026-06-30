@@ -56,57 +56,43 @@ public class TaskNotificationApp extends Application {
     private Stage allTasksStage;
 
     @Override
-public void start(Stage stage) {
-    mainStage = stage;
+    public void start(Stage stage) {
+        mainStage = stage;
+        mainTaskTable = buildMainTaskTable();
+        HBox actions = buildMainActions();
 
-    // Build the table
-    mainTaskTable = buildMainTaskTable();
+        Label title = new Label("Main");
+        title.getStyleClass().add("screen-title");
 
-    // Build the action buttons
-    HBox actions = buildMainActions();
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-    // Title
-    Label title = new Label("Main");
-    title.getStyleClass().add("screen-title");
+        HBox topRow = new HBox(10);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+        topRow.getChildren().addAll(title, spacer, actions);
 
-    // Spacer pushes the buttons to the right
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
+        VBox header = new VBox(0);
+        header.setPadding(new Insets(8, 12, 6, 12));
+        header.getChildren().add(topRow);
 
-    // First row: Title + Spacer + Button
-    HBox topRow = new HBox(10);
-    topRow.setAlignment(Pos.CENTER_LEFT);
-    topRow.getChildren().addAll(title, spacer, actions);
+        BorderPane root = new BorderPane();
+        root.setTop(header);
+        root.setCenter(mainTaskTable);
+        root.getStyleClass().add("main-root");
 
-    // Header
-    VBox header = new VBox(0);
-    header.setPadding(new Insets(8, 12, 6, 12));
-    header.getChildren().add(topRow);
+        Scene scene = new Scene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
+        scene.getStylesheets().add(getClass().getResource("/com/tasknotification/styles/main.css").toExternalForm());
 
-    // Root layout
-    BorderPane root = new BorderPane();
-    root.setTop(header);
-    root.setCenter(mainTaskTable);
-    root.getStyleClass().add("main-root");
+        stage.setTitle("Main");
+        stage.setMinWidth(480);
+        stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
+        stage.setScene(scene);
+        stage.show();
 
-    // Scene
-    Scene scene = new Scene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
-    scene.getStylesheets().add(
-        getClass()
-            .getResource("/com/tasknotification/styles/main.css")
-            .toExternalForm()
-    );
+        loadMainTasks();
+    }
 
-    stage.setTitle("Main");
-    stage.setMinWidth(480);
-    stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
-    stage.setScene(scene);
-    stage.show();
-
-    loadMainTasks();
-}
-
-     private HBox buildMainActions() {
+    private HBox buildMainActions() {
         Button seeAllButton = new Button("See All Tasks");
         seeAllButton.setOnAction(event -> showAllTasksWindow());
 
