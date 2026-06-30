@@ -9,6 +9,7 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -25,7 +26,9 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 
 import java.sql.SQLException;
@@ -39,56 +42,94 @@ import java.util.Optional;
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private static final int MAIN_TASK_LIMIT = 3;
+    private static final double MAIN_WINDOW_WIDTH = 520;
+    private static final double MAIN_WINDOW_BASE_HEIGHT = 128;
+    private static final double MAIN_ROW_HEIGHT = 38;
+    private static final double MAIN_TABLE_HEADER_HEIGHT = 32;
 
     private final TaskRepository taskRepository = new TaskRepository();
     private final ObservableList<Task> mainTasks = FXCollections.observableArrayList();
     private final ObservableList<Task> allTasks = FXCollections.observableArrayList();
-    private final Label mainStatusLabel = new Label();
     private final Label allTasksStatusLabel = new Label();
+    private TableView<Task> mainTaskTable;
+    private Stage mainStage;
     private Stage allTasksStage;
 
     @Override
-    public void start(Stage stage) {
-        TableView<Task> taskTable = buildMainTaskTable();
-        HBox actions = buildMainActions();
+public void start(Stage stage) {
+    mainStage = stage;
 
-        Label title = new Label("Main");
-        title.getStyleClass().add("screen-title");
+    // Build the table
+    mainTaskTable = buildMainTaskTable();
 
-        mainStatusLabel.getStyleClass().add("status-label");
+    // Build the action buttons
+    HBox actions = buildMainActions();
 
-        VBox header = new VBox(10, title, mainStatusLabel, actions);
-        header.setPadding(new Insets(16, 16, 10, 16));
+    // Title
+    Label title = new Label("Main");
+    title.getStyleClass().add("screen-title");
 
-        BorderPane root = new BorderPane();
-        root.setTop(header);
-        root.setCenter(taskTable);
-        root.getStyleClass().add("app-root");
+    // Spacer pushes the buttons to the right
+    Region spacer = new Region();
+    HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Scene scene = new Scene(root, 900, 560);
-        scene.getStylesheets().add(getClass().getResource("/com/tasknotification/styles/app.css").toExternalForm());
+    // First row: Title + Spacer + Button
+    HBox topRow = new HBox(10);
+    topRow.setAlignment(Pos.CENTER_LEFT);
+    topRow.getChildren().addAll(title, spacer, actions);
 
-        stage.setTitle("Main");
-        stage.setMinWidth(760);
-        stage.setMinHeight(420);
-        stage.setScene(scene);
-        stage.show();
+    // Header
+    VBox header = new VBox(0);
+    header.setPadding(new Insets(8, 12, 6, 12));
+    header.getChildren().add(topRow);
 
-        loadMainTasks();
+    // Root layout
+    BorderPane root = new BorderPane();
+    root.setTop(header);
+    root.setCenter(mainTaskTable);
+    root.getStyleClass().add("main-root");
+
+    // Scene
+    Scene scene = new Scene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
+    scene.getStylesheets().add(
+        getClass()
+            .getResource("/com/tasknotification/styles/main.css")
+            .toExternalForm()
+    );
+
+    stage.setTitle("Main");
+    stage.setMinWidth(480);
+    stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
+    stage.setScene(scene);
+    stage.show();
+
+    loadMainTasks();
+}
+
+     private HBox buildMainActions() {
+        Button seeAllButton = new Button("See All Tasks");
+        seeAllButton.setOnAction(event -> showAllTasksWindow());
+
+        HBox actions = new HBox(8, seeAllButton);
+        actions.getStyleClass().add("actions");
+        return actions;
     }
 
     private TableView<Task> buildMainTaskTable() {
         TableView<Task> table = new TableView<>(mainTasks);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("No unfinished tasks found."));
+        table.getStyleClass().add("main-table");
+        table.setFixedCellSize(MAIN_ROW_HEIGHT);
+        table.setMinHeight(MAIN_TABLE_HEADER_HEIGHT + MAIN_ROW_HEIGHT);
 
         TableColumn<Task, String> taskColumn = new TableColumn<>("Task");
         taskColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().taskDescription()));
-        taskColumn.setPrefWidth(440);
+        taskColumn.setPrefWidth(280);
 
         TableColumn<Task, String> deadlineColumn = new TableColumn<>("Deadline");
         deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
-        deadlineColumn.setPrefWidth(180);
+        deadlineColumn.setPrefWidth(140);
 
         table.getColumns().add(taskColumn);
         table.getColumns().add(deadlineColumn);
@@ -167,18 +208,11 @@ public class TaskNotificationApp extends Application {
                 setGraphic(completedCheckBox);
             }
         });
-        completedColumn.setPrefWidth(120);
+        completedColumn.setPrefWidth(95);
         return completedColumn;
     }
 
-    private HBox buildMainActions() {
-        Button seeAllButton = new Button("See All Tasks");
-        seeAllButton.setOnAction(event -> showAllTasksWindow());
-
-        HBox actions = new HBox(8, seeAllButton);
-        actions.getStyleClass().add("actions");
-        return actions;
-    }
+   
 
     private HBox buildAllTasksActions(TableView<Task> taskTable) {
         Button addButton = new Button("Add Task");
@@ -326,11 +360,8 @@ public class TaskNotificationApp extends Application {
             DatabaseInitializer.initialize();
             List<Task> databaseTasks = taskRepository.findClosestUnfinished(MAIN_TASK_LIMIT);
             mainTasks.setAll(databaseTasks);
-            mainStatusLabel.setText(databaseTasks.isEmpty()
-                    ? "There are no unfinished tasks."
-                    : "Showing up to 3 unfinished tasks closest to their deadlines.");
+            resizeMainWindow(databaseTasks.size());
         } catch (SQLException exception) {
-            mainStatusLabel.setText("Could not load tasks from the database.");
             throw new IllegalStateException("Failed to load tasks", exception);
         }
     }
@@ -354,6 +385,22 @@ public class TaskNotificationApp extends Application {
         if (allTasksStage != null && allTasksStage.isShowing()) {
             loadAllTasks();
         }
+    }
+
+    private void resizeMainWindow(int taskCount) {
+        if (mainStage == null) {
+            return;
+        }
+
+        int visibleRows = Math.max(1, Math.min(MAIN_TASK_LIMIT, taskCount));
+        double tableHeight = MAIN_TABLE_HEADER_HEIGHT + (visibleRows * MAIN_ROW_HEIGHT);
+        if (mainTaskTable != null) {
+            mainTaskTable.setPrefHeight(tableHeight);
+            mainTaskTable.setMaxHeight(tableHeight);
+        }
+
+        mainStage.setWidth(MAIN_WINDOW_WIDTH);
+        mainStage.setHeight(MAIN_WINDOW_BASE_HEIGHT + (visibleRows * MAIN_ROW_HEIGHT));
     }
 
     private boolean confirmCompletedChange(Task task, boolean completed) {
