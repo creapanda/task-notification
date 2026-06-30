@@ -1,0 +1,1 @@
+-- Initial SQLite schema will be added when persistence work begins.
