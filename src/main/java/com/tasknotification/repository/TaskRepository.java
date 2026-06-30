@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -74,6 +75,37 @@ public class TaskRepository {
         try (Connection connection = connectionFactory.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, limit);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    tasks.add(mapTask(resultSet));
+                }
+            }
+        }
+        return tasks;
+    }
+
+    public List<Task> findUnfinishedDueWithin(LocalDateTime now, Duration duration) throws SQLException {
+        String sql = """
+                SELECT id,
+                       date_created,
+                       person,
+                       task_description,
+                       deadline,
+                       completed
+                FROM tasks
+                WHERE completed = 0
+                  AND deadline IS NOT NULL
+                  AND deadline != ''
+                  AND deadline > ?
+                  AND deadline <= ?
+                ORDER BY deadline ASC, id DESC
+                """;
+
+        List<Task> tasks = new ArrayList<>();
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, formatDateTime(now));
+            statement.setString(2, formatDateTime(now.plus(duration)));
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     tasks.add(mapTask(resultSet));
