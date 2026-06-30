@@ -137,6 +137,21 @@ public class TaskRepository {
         }
     }
 
+    public void updateCompleted(long taskId, boolean completed) throws SQLException {
+        String sql = """
+                UPDATE tasks
+                SET completed = ?
+                WHERE id = ?
+                """;
+
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, completed ? 1 : 0);
+            statement.setLong(2, taskId);
+            statement.executeUpdate();
+        }
+    }
+
     private Task mapTask(ResultSet resultSet) throws SQLException {
         return new Task(
                 resultSet.getLong("id"),

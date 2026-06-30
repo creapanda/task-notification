@@ -49,8 +49,8 @@ public class TaskNotificationApp extends Application {
 
     @Override
     public void start(Stage stage) {
-        TableView<Task> taskTable = buildTaskTable(mainTasks, "No unfinished tasks found.");
-        HBox actions = buildMainActions(taskTable);
+        TableView<Task> taskTable = buildMainTaskTable();
+        HBox actions = buildMainActions();
 
         Label title = new Label("Main");
         title.getStyleClass().add("screen-title");
@@ -77,10 +77,31 @@ public class TaskNotificationApp extends Application {
         loadMainTasks();
     }
 
-    private TableView<Task> buildTaskTable(ObservableList<Task> tableTasks, String placeholderText) {
+    private TableView<Task> buildMainTaskTable() {
+        TableView<Task> table = new TableView<>(mainTasks);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        table.setPlaceholder(new Label("No unfinished tasks found."));
+
+        TableColumn<Task, String> taskColumn = new TableColumn<>("Task");
+        taskColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().taskDescription()));
+        taskColumn.setPrefWidth(440);
+
+        TableColumn<Task, String> deadlineColumn = new TableColumn<>("Deadline");
+        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
+        deadlineColumn.setPrefWidth(180);
+
+        table.getColumns().add(taskColumn);
+        table.getColumns().add(deadlineColumn);
+        table.getColumns().add(buildCompletedColumn());
+
+        return table;
+    }
+
+    private TableView<Task> buildAllTasksTable() {
+        ObservableList<Task> tableTasks = allTasks;
         TableView<Task> table = new TableView<>(tableTasks);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        table.setPlaceholder(new Label(placeholderText));
+        table.setPlaceholder(new Label("No tasks found in the database."));
 
         TableColumn<Task, Long> idColumn = new TableColumn<>("ID");
         idColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().id()));
@@ -102,32 +123,59 @@ public class TaskNotificationApp extends Application {
         deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
         deadlineColumn.setPrefWidth(160);
 
-        TableColumn<Task, String> completedColumn = new TableColumn<>("Completed");
-        completedColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().completed() ? "Yes" : "No"));
-        completedColumn.setPrefWidth(110);
-
         table.getColumns().add(idColumn);
         table.getColumns().add(createdColumn);
         table.getColumns().add(personColumn);
         table.getColumns().add(taskColumn);
         table.getColumns().add(deadlineColumn);
-        table.getColumns().add(completedColumn);
+        table.getColumns().add(buildCompletedColumn());
 
         return table;
     }
 
-    private HBox buildMainActions(TableView<Task> taskTable) {
-        Button addButton = new Button("Add Task");
-        addButton.setOnAction(event -> showAddTaskDialog());
+    private TableColumn<Task, Boolean> buildCompletedColumn() {
+        TableColumn<Task, Boolean> completedColumn = new TableColumn<>("Completed");
+        completedColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().completed()));
+        completedColumn.setCellFactory(column -> new javafx.scene.control.TableCell<>() {
+            private final CheckBox completedCheckBox = new CheckBox();
 
-        Button editButton = new Button("Edit Task");
-        editButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
-        editButton.setOnAction(event -> showEditTaskDialog(taskTable.getSelectionModel().getSelectedItem()));
+            {
+                completedCheckBox.setOnAction(event -> {
+                    Task task = getTableRow().getItem();
+                    if (task == null) {
+                        return;
+                    }
 
+                    boolean newCompletedValue = completedCheckBox.isSelected();
+                    if (confirmCompletedChange(task, newCompletedValue)) {
+                        updateTaskCompleted(task, newCompletedValue);
+                    } else {
+                        completedCheckBox.setSelected(task.completed());
+                    }
+                });
+            }
+
+            @Override
+            protected void updateItem(Boolean completed, boolean empty) {
+                super.updateItem(completed, empty);
+                if (empty || completed == null) {
+                    setGraphic(null);
+                    return;
+                }
+
+                completedCheckBox.setSelected(completed);
+                setGraphic(completedCheckBox);
+            }
+        });
+        completedColumn.setPrefWidth(120);
+        return completedColumn;
+    }
+
+    private HBox buildMainActions() {
         Button seeAllButton = new Button("See All Tasks");
         seeAllButton.setOnAction(event -> showAllTasksWindow());
 
-        HBox actions = new HBox(8, addButton, editButton, seeAllButton);
+        HBox actions = new HBox(8, seeAllButton);
         actions.getStyleClass().add("actions");
         return actions;
     }
@@ -151,7 +199,7 @@ public class TaskNotificationApp extends Application {
             return;
         }
 
-        TableView<Task> taskTable = buildTaskTable(allTasks, "No tasks found in the database.");
+        TableView<Task> taskTable = buildAllTasksTable();
         HBox actions = buildAllTasksActions(taskTable);
 
         Label title = new Label("All Tasks");
@@ -305,6 +353,26 @@ public class TaskNotificationApp extends Application {
         loadMainTasks();
         if (allTasksStage != null && allTasksStage.isShowing()) {
             loadAllTasks();
+        }
+    }
+
+    private boolean confirmCompletedChange(Task task, boolean completed) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Task Update");
+        alert.setHeaderText(null);
+        alert.setContentText("Mark \"" + task.taskDescription() + "\" as " + (completed ? "completed" : "unfinished") + "?");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == ButtonType.OK;
+    }
+
+    private void updateTaskCompleted(Task task, boolean completed) {
+        try {
+            taskRepository.updateCompleted(task.id(), completed);
+            refreshOpenWindows();
+        } catch (SQLException exception) {
+            showError("Could not update the task.");
+            refreshOpenWindows();
         }
     }
 

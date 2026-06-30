@@ -93,6 +93,20 @@ class TaskRepositoryTest {
     }
 
     @Test
+    void updateCompletedChangesOnlyCompletedState() throws Exception {
+        Task createdTask = taskRepository.add("Alex", "Prepare report", LocalDateTime.of(2026, 7, 1, 0, 0), false);
+
+        taskRepository.updateCompleted(createdTask.id(), true);
+
+        Task savedTask = taskRepository.findAll().getFirst();
+        assertEquals(createdTask.id(), savedTask.id());
+        assertEquals(createdTask.person(), savedTask.person());
+        assertEquals(createdTask.taskDescription(), savedTask.taskDescription());
+        assertEquals(createdTask.deadline(), savedTask.deadline());
+        assertTrue(savedTask.completed());
+    }
+
+    @Test
     void findClosestUnfinishedReturnsNearestIncompleteDeadlinesUpToLimit() throws Exception {
         taskRepository.add("Alex", "Later unfinished", LocalDateTime.of(2026, 7, 10, 0, 0), false);
         taskRepository.add("Sam", "Completed earlier", LocalDateTime.of(2026, 7, 1, 0, 0), true);

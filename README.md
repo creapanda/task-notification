@@ -24,7 +24,7 @@ The Main window displays up to 3 unfinished tasks closest to their deadlines.
 mvn clean javafx:run
 ```
 
-On first launch, the app creates `database/tasks.db`. The Main window displays up to 3 unfinished tasks closest to their deadlines, and the See All Tasks button opens a second window with the full task list.
+On first launch, the app creates `database/tasks.db`. The Main window displays task description, deadline, and completed status for up to 3 unfinished tasks closest to their deadlines. The See All Tasks button opens a second window with the full task list.
 
 ## Test
 
