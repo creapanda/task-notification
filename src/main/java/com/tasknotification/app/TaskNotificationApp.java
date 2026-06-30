@@ -2,6 +2,7 @@ package com.tasknotification.app;
 
 import com.tasknotification.database.DatabaseInitializer;
 import com.tasknotification.model.Task;
+import com.tasknotification.notification.DeadlineNotificationService;
 import com.tasknotification.repository.TaskRepository;
 import javafx.application.Application;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -48,6 +49,7 @@ public class TaskNotificationApp extends Application {
     private static final double MAIN_TABLE_HEADER_HEIGHT = 32;
 
     private final TaskRepository taskRepository = new TaskRepository();
+    private final DeadlineNotificationService deadlineNotificationService = new DeadlineNotificationService(taskRepository);
     private final ObservableList<Task> mainTasks = FXCollections.observableArrayList();
     private final ObservableList<Task> allTasks = FXCollections.observableArrayList();
     private final Label allTasksStatusLabel = new Label();
@@ -110,9 +112,13 @@ public void start(Stage stage) {
         Button seeAllButton = new Button("See All Tasks");
         seeAllButton.setOnAction(event -> showAllTasksWindow());
 
-        HBox actions = new HBox(8, seeAllButton);
-        actions.getStyleClass().add("actions");
-        return actions;
+        loadMainTasks();
+        deadlineNotificationService.start();
+    }
+
+    @Override
+    public void stop() {
+        deadlineNotificationService.stop();
     }
 
     private TableView<Task> buildMainTaskTable() {
@@ -274,6 +280,7 @@ public void start(Stage stage) {
                         formData.completed()
                 );
                 refreshOpenWindows();
+                deadlineNotificationService.checkNow();
             } catch (SQLException exception) {
                 showError("Could not add the task.");
             }
@@ -293,6 +300,7 @@ public void start(Stage stage) {
                         formData.completed()
                 ));
                 refreshOpenWindows();
+                deadlineNotificationService.checkNow();
             } catch (SQLException exception) {
                 showError("Could not update the task.");
             }
@@ -417,6 +425,7 @@ public void start(Stage stage) {
         try {
             taskRepository.updateCompleted(task.id(), completed);
             refreshOpenWindows();
+            deadlineNotificationService.checkNow();
         } catch (SQLException exception) {
             showError("Could not update the task.");
             refreshOpenWindows();

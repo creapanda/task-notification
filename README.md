@@ -26,6 +26,8 @@ mvn clean javafx:run
 
 On first launch, the app creates `database/tasks.db`. The Main window displays task description, deadline, and completed status for up to 3 unfinished tasks closest to their deadlines. The See All Tasks button opens a second window with the full task list.
 
+The app checks unfinished task deadlines while it is running and sends a desktop notification when a task is due within 24 hours or 12 hours.
+
 ## Test
 
 ```bash
