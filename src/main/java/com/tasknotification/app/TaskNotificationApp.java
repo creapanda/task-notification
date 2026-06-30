@@ -38,22 +38,26 @@ import java.util.Optional;
 
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
+    private static final int MAIN_TASK_LIMIT = 3;
 
     private final TaskRepository taskRepository = new TaskRepository();
-    private final ObservableList<Task> tasks = FXCollections.observableArrayList();
-    private final Label statusLabel = new Label();
+    private final ObservableList<Task> mainTasks = FXCollections.observableArrayList();
+    private final ObservableList<Task> allTasks = FXCollections.observableArrayList();
+    private final Label mainStatusLabel = new Label();
+    private final Label allTasksStatusLabel = new Label();
+    private Stage allTasksStage;
 
     @Override
     public void start(Stage stage) {
-        TableView<Task> taskTable = buildTaskTable();
-        HBox actions = buildActions(taskTable);
+        TableView<Task> taskTable = buildTaskTable(mainTasks, "No unfinished tasks found.");
+        HBox actions = buildMainActions(taskTable);
 
-        Label title = new Label("Task Notification");
+        Label title = new Label("Main");
         title.getStyleClass().add("screen-title");
 
-        statusLabel.getStyleClass().add("status-label");
+        mainStatusLabel.getStyleClass().add("status-label");
 
-        VBox header = new VBox(10, title, statusLabel, actions);
+        VBox header = new VBox(10, title, mainStatusLabel, actions);
         header.setPadding(new Insets(16, 16, 10, 16));
 
         BorderPane root = new BorderPane();
@@ -64,19 +68,19 @@ public class TaskNotificationApp extends Application {
         Scene scene = new Scene(root, 900, 560);
         scene.getStylesheets().add(getClass().getResource("/com/tasknotification/styles/app.css").toExternalForm());
 
-        stage.setTitle("Task Notification");
+        stage.setTitle("Main");
         stage.setMinWidth(760);
         stage.setMinHeight(420);
         stage.setScene(scene);
         stage.show();
 
-        loadTasks();
+        loadMainTasks();
     }
 
-    private TableView<Task> buildTaskTable() {
-        TableView<Task> table = new TableView<>(tasks);
+    private TableView<Task> buildTaskTable(ObservableList<Task> tableTasks, String placeholderText) {
+        TableView<Task> table = new TableView<>(tableTasks);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        table.setPlaceholder(new Label("No tasks found in the database."));
+        table.setPlaceholder(new Label(placeholderText));
 
         TableColumn<Task, Long> idColumn = new TableColumn<>("ID");
         idColumn.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<>(cell.getValue().id()));
@@ -112,7 +116,23 @@ public class TaskNotificationApp extends Application {
         return table;
     }
 
-    private HBox buildActions(TableView<Task> taskTable) {
+    private HBox buildMainActions(TableView<Task> taskTable) {
+        Button addButton = new Button("Add Task");
+        addButton.setOnAction(event -> showAddTaskDialog());
+
+        Button editButton = new Button("Edit Task");
+        editButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
+        editButton.setOnAction(event -> showEditTaskDialog(taskTable.getSelectionModel().getSelectedItem()));
+
+        Button seeAllButton = new Button("See All Tasks");
+        seeAllButton.setOnAction(event -> showAllTasksWindow());
+
+        HBox actions = new HBox(8, addButton, editButton, seeAllButton);
+        actions.getStyleClass().add("actions");
+        return actions;
+    }
+
+    private HBox buildAllTasksActions(TableView<Task> taskTable) {
         Button addButton = new Button("Add Task");
         addButton.setOnAction(event -> showAddTaskDialog());
 
@@ -125,6 +145,42 @@ public class TaskNotificationApp extends Application {
         return actions;
     }
 
+    private void showAllTasksWindow() {
+        if (allTasksStage != null && allTasksStage.isShowing()) {
+            allTasksStage.toFront();
+            return;
+        }
+
+        TableView<Task> taskTable = buildTaskTable(allTasks, "No tasks found in the database.");
+        HBox actions = buildAllTasksActions(taskTable);
+
+        Label title = new Label("All Tasks");
+        title.getStyleClass().add("screen-title");
+
+        allTasksStatusLabel.getStyleClass().add("status-label");
+
+        VBox header = new VBox(10, title, allTasksStatusLabel, actions);
+        header.setPadding(new Insets(16, 16, 10, 16));
+
+        BorderPane root = new BorderPane();
+        root.setTop(header);
+        root.setCenter(taskTable);
+        root.getStyleClass().add("app-root");
+
+        Scene scene = new Scene(root, 900, 560);
+        scene.getStylesheets().add(getClass().getResource("/com/tasknotification/styles/app.css").toExternalForm());
+
+        allTasksStage = new Stage();
+        allTasksStage.setTitle("All Tasks");
+        allTasksStage.setMinWidth(760);
+        allTasksStage.setMinHeight(420);
+        allTasksStage.setScene(scene);
+        allTasksStage.setOnCloseRequest(event -> allTasksStage = null);
+        allTasksStage.show();
+
+        loadAllTasks();
+    }
+
     private void showAddTaskDialog() {
         Optional<TaskFormData> result = showTaskDialog("Add Task", null);
         result.ifPresent(formData -> {
@@ -135,7 +191,7 @@ public class TaskNotificationApp extends Application {
                         formData.deadline(),
                         formData.completed()
                 );
-                loadTasks();
+                refreshOpenWindows();
             } catch (SQLException exception) {
                 showError("Could not add the task.");
             }
@@ -154,7 +210,7 @@ public class TaskNotificationApp extends Application {
                         formData.deadline(),
                         formData.completed()
                 ));
-                loadTasks();
+                refreshOpenWindows();
             } catch (SQLException exception) {
                 showError("Could not update the task.");
             }
@@ -217,17 +273,38 @@ public class TaskNotificationApp extends Application {
         return dialog.showAndWait();
     }
 
-    private void loadTasks() {
+    private void loadMainTasks() {
+        try {
+            DatabaseInitializer.initialize();
+            List<Task> databaseTasks = taskRepository.findClosestUnfinished(MAIN_TASK_LIMIT);
+            mainTasks.setAll(databaseTasks);
+            mainStatusLabel.setText(databaseTasks.isEmpty()
+                    ? "There are no unfinished tasks."
+                    : "Showing up to 3 unfinished tasks closest to their deadlines.");
+        } catch (SQLException exception) {
+            mainStatusLabel.setText("Could not load tasks from the database.");
+            throw new IllegalStateException("Failed to load tasks", exception);
+        }
+    }
+
+    private void loadAllTasks() {
         try {
             DatabaseInitializer.initialize();
             List<Task> databaseTasks = taskRepository.findAll();
-            tasks.setAll(databaseTasks);
-            statusLabel.setText(databaseTasks.isEmpty()
-                    ? "Database is ready. There are no tasks yet."
-                    : "Showing " + databaseTasks.size() + " task(s) from the database.");
+            allTasks.setAll(databaseTasks);
+            allTasksStatusLabel.setText(databaseTasks.isEmpty()
+                    ? "There are no tasks yet."
+                    : "Showing " + databaseTasks.size() + " task(s).");
         } catch (SQLException exception) {
-            statusLabel.setText("Could not load tasks from the database.");
+            allTasksStatusLabel.setText("Could not load tasks from the database.");
             throw new IllegalStateException("Failed to load tasks", exception);
+        }
+    }
+
+    private void refreshOpenWindows() {
+        loadMainTasks();
+        if (allTasksStage != null && allTasksStage.isShowing()) {
+            loadAllTasks();
         }
     }
 

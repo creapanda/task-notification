@@ -91,4 +91,30 @@ class TaskRepositoryTest {
         assertEquals(LocalDateTime.of(2026, 7, 2, 0, 0), savedTask.deadline());
         assertTrue(savedTask.completed());
     }
+
+    @Test
+    void findClosestUnfinishedReturnsNearestIncompleteDeadlinesUpToLimit() throws Exception {
+        taskRepository.add("Alex", "Later unfinished", LocalDateTime.of(2026, 7, 10, 0, 0), false);
+        taskRepository.add("Sam", "Completed earlier", LocalDateTime.of(2026, 7, 1, 0, 0), true);
+        taskRepository.add("Jordan", "Closest unfinished", LocalDateTime.of(2026, 7, 2, 0, 0), false);
+        taskRepository.add("Taylor", "Middle unfinished", LocalDateTime.of(2026, 7, 5, 0, 0), false);
+        taskRepository.add("Riley", "Fourth unfinished", LocalDateTime.of(2026, 7, 20, 0, 0), false);
+
+        List<Task> tasks = taskRepository.findClosestUnfinished(3);
+
+        assertEquals(3, tasks.size());
+        assertEquals("Closest unfinished", tasks.getFirst().taskDescription());
+        assertEquals("Middle unfinished", tasks.get(1).taskDescription());
+        assertEquals("Later unfinished", tasks.get(2).taskDescription());
+        assertTrue(tasks.stream().noneMatch(Task::completed));
+    }
+
+    @Test
+    void findClosestUnfinishedIgnoresCompletedTasks() throws Exception {
+        taskRepository.add("Alex", "Completed task", LocalDateTime.of(2026, 7, 1, 0, 0), true);
+
+        List<Task> tasks = taskRepository.findClosestUnfinished(3);
+
+        assertTrue(tasks.isEmpty());
+    }
 }
