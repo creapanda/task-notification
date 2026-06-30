@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -130,5 +131,19 @@ class TaskRepositoryTest {
         List<Task> tasks = taskRepository.findClosestUnfinished(3);
 
         assertTrue(tasks.isEmpty());
+    }
+
+    @Test
+    void findUnfinishedDueWithinReturnsOnlyTasksInsideWindow() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 1, 9, 0);
+        taskRepository.add("Alex", "Due in 10 hours", now.plusHours(10), false);
+        taskRepository.add("Sam", "Due in 30 hours", now.plusHours(30), false);
+        taskRepository.add("Jordan", "Already complete", now.plusHours(8), true);
+        taskRepository.add("Taylor", "Already overdue", now.minusHours(1), false);
+
+        List<Task> tasks = taskRepository.findUnfinishedDueWithin(now, Duration.ofHours(24));
+
+        assertEquals(1, tasks.size());
+        assertEquals("Due in 10 hours", tasks.getFirst().taskDescription());
     }
 }
