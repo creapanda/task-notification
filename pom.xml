@@ -7,7 +7,7 @@
     <artifactId>task-notification</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>Task Notification</name>
-    <description>Java desktop task reminder and notification application.</description>
+    <description>Java desktop task list application.</description>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

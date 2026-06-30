@@ -17,9 +17,7 @@ task-notification/
           controller/
           database/
           model/
-          notification/
           repository/
-          scheduler/
           service/
           util/
       resources/
@@ -36,10 +34,8 @@ task-notification/
 
 - `app`: application startup and JavaFX bootstrapping
 - `controller`: JavaFX screen controllers
-- `database`: database connection and migration setup
-- `model`: task entities, enums, and value objects
-- `notification`: desktop notification integration
+- `database`: database connection and schema setup
+- `model`: task entity
 - `repository`: persistence layer for tasks
-- `scheduler`: reminder scheduling and background checks
 - `service`: application business logic
 - `util`: shared helpers

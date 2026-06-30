@@ -1,10 +1,10 @@
 # Task Notification
 
-A Java desktop application for task management, reminders, desktop notifications, priorities, and completion tracking.
+A Java desktop application for viewing tasks stored in a local SQLite database.
 
 ## Current Status
 
-Project structure is being prepared before feature implementation begins.
+The first working screen displays the task list currently stored in the database.
 
 ## Planned Stack
 
@@ -17,3 +17,11 @@ Project structure is being prepared before feature implementation begins.
 
 - [Roadmap](docs/ROADMAP.md)
 - [Project Structure](docs/STRUCTURE.md)
+
+## Run
+
+```bash
+mvn clean javafx:run
+```
+
+On first launch, the app creates `database/tasks.db` and displays every row currently stored in the `tasks` table.
