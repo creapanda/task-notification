@@ -4,7 +4,7 @@ A Java desktop application for viewing tasks stored in a local SQLite database.
 
 ## Current Status
 
-The first working screen displays the task list currently stored in the database.
+The Main window displays up to 3 unfinished tasks closest to their deadlines.
 
 ## Planned Stack
 
@@ -24,7 +24,7 @@ The first working screen displays the task list currently stored in the database
 mvn clean javafx:run
 ```
 
-On first launch, the app creates `database/tasks.db` and displays every row currently stored in the `tasks` table.
+On first launch, the app creates `database/tasks.db`. The Main window displays task description, deadline, and completed status for up to 3 unfinished tasks closest to their deadlines. The See All Tasks button opens a second window with the full task list.
 
 ## Test
 

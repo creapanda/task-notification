@@ -53,6 +53,36 @@ public class TaskRepository {
         return tasks;
     }
 
+    public List<Task> findClosestUnfinished(int limit) throws SQLException {
+        String sql = """
+                SELECT id,
+                       date_created,
+                       person,
+                       task_description,
+                       deadline,
+                       completed
+                FROM tasks
+                WHERE completed = 0
+                ORDER BY
+                    CASE WHEN deadline IS NULL OR deadline = '' THEN 1 ELSE 0 END,
+                    deadline ASC,
+                    id DESC
+                LIMIT ?
+                """;
+
+        List<Task> tasks = new ArrayList<>();
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, limit);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    tasks.add(mapTask(resultSet));
+                }
+            }
+        }
+        return tasks;
+    }
+
     public Task add(String person, String taskDescription, LocalDateTime deadline, boolean completed) throws SQLException {
         String sql = """
                 INSERT INTO tasks (date_created, person, task_description, deadline, completed)
@@ -103,6 +133,21 @@ public class TaskRepository {
             setNullableDateTime(statement, 3, task.deadline());
             statement.setInt(4, task.completed() ? 1 : 0);
             statement.setLong(5, task.id());
+            statement.executeUpdate();
+        }
+    }
+
+    public void updateCompleted(long taskId, boolean completed) throws SQLException {
+        String sql = """
+                UPDATE tasks
+                SET completed = ?
+                WHERE id = ?
+                """;
+
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, completed ? 1 : 0);
+            statement.setLong(2, taskId);
             statement.executeUpdate();
         }
     }
