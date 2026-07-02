@@ -5,6 +5,7 @@ A Java desktop application for viewing tasks stored in a local SQLite database.
 ## Current Status
 
 The Main window is a compact view that displays up to 3 unfinished tasks closest to their deadlines.
+the lisy window is a fully dispaly table with all the task and allow user to make change of the task
 
 ## Planned Stack
 
@@ -17,8 +18,14 @@ The Main window is a compact view that displays up to 3 unfinished tasks closest
 
 - [Roadmap](docs/ROADMAP.md)
 - [Project Structure](docs/STRUCTURE.md)
+- [Project Description](docs/Project_des.md)
 
 ## Run
+
+To be able to run this in development you need to have Maven install and setup
+link to dowload
+"https://maven.apache.org/download.cgi" 
+
 
 ```bash
 mvn clean javafx:run
