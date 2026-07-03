@@ -134,6 +134,18 @@ class TaskRepositoryTest {
     }
 
     @Test
+    void findCompletedReturnsOnlyCompletedTasks() throws Exception {
+        taskRepository.add("Alex", "Finished task", LocalDateTime.of(2026, 7, 1, 0, 0), true);
+        taskRepository.add("Sam", "Unfinished task", LocalDateTime.of(2026, 7, 2, 0, 0), false);
+
+        List<Task> tasks = taskRepository.findCompleted();
+
+        assertEquals(1, tasks.size());
+        assertEquals("Finished task", tasks.getFirst().taskDescription());
+        assertTrue(tasks.getFirst().completed());
+    }
+
+    @Test
     void findUnfinishedDueWithinReturnsOnlyTasksInsideWindow() throws Exception {
         LocalDateTime now = LocalDateTime.of(2026, 7, 1, 9, 0);
         taskRepository.add("Alex", "Due in 10 hours", now.plusHours(10), false);

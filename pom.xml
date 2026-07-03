@@ -16,6 +16,7 @@
         <javafx.version>24.0.2</javafx.version>
         <sqlite.version>3.46.1.0</sqlite.version>
         <junit.version>5.10.3</junit.version>
+        <poi.version>5.3.0</poi.version>
     </properties>
 
     <dependencies>
@@ -33,6 +34,11 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>${sqlite.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
