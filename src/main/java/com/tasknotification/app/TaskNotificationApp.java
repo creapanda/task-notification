@@ -94,12 +94,13 @@ public class TaskNotificationApp extends Application {
         loadMainTasks();
     }
 
-    private HBox buildMainActions() {
+   private HBox buildMainActions() {
         Button seeAllButton = new Button("See All Tasks");
         seeAllButton.setOnAction(event -> showAllTasksWindow());
 
-        loadMainTasks();
-        deadlineNotificationService.start();
+        HBox actions = new HBox(8, seeAllButton);
+        actions.getStyleClass().add("actions");
+        return actions;
     }
 
     @Override
