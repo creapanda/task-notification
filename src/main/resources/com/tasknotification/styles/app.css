@@ -1,35 +1,60 @@
+/*chỉnh sửa giao diện cho ứng dụng Task Notification phần ứng dụng */
+
+
 .app-root {
-    -fx-background-color: #f6f7f9;
+    -fx-background-color: #f4f8fb;
     -fx-font-family: "Segoe UI", Arial, sans-serif;
 }
 
 .screen-title {
-    -fx-font-size: 24px;
+    -fx-font-size: 26px;
     -fx-font-weight: 700;
-    -fx-text-fill: #20242a;
+    -fx-text-fill: #1b2838;
 }
 
 .status-label {
     -fx-font-size: 13px;
-    -fx-text-fill: #5d6673;
+    -fx-text-fill: #35506b;
+}
+
+.button {
+    -fx-background-color: #2a75bb;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-padding: 7 13 7 13;
+    -fx-background-radius: 4;
+}
+
+.button:hover {
+    -fx-background-color: #1999ff;
+}
+
+.button:disabled {
+    -fx-background-color: #d7dee6;
+    -fx-text-fill: #8793a0;
 }
 
 .table-view {
-    -fx-background-color: white;
-    -fx-border-color: #dfe3e8;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c8d6e3;
     -fx-border-width: 1 0 0 0;
 }
 
 .table-view .column-header-background {
-    -fx-background-color: #eef1f5;
+    -fx-background-color: transparent;
 }
 
 .table-view .column-header,
 .table-view .filler {
-    -fx-background-color: transparent;
+    -fx-text-fill: #1b2838;
+    -fx-font-weight: 700;
 }
 
 .table-view .column-header .label {
-    -fx-text-fill: #28313d;
-    -fx-font-weight: 700;
+     -fx-font-size: 12px;
+    -fx-text-fill: #1f2933;
+    -fx-padding: 0 8 0 8;
 }
+
+
