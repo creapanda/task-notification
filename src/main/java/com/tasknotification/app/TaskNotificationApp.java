@@ -39,6 +39,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import javafx.scene.image.Image; 
 
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
@@ -89,6 +90,7 @@ public class TaskNotificationApp extends Application {
         stage.setMinWidth(480);
         stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
         stage.setScene(scene);
+        stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
         stage.show();
 
         loadMainTasks();
@@ -251,6 +253,7 @@ public class TaskNotificationApp extends Application {
         allTasksStage.setMinWidth(760);
         allTasksStage.setMinHeight(420);
         allTasksStage.setScene(scene);
+        allTasksStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/list-icon.png")));
         allTasksStage.setOnCloseRequest(event -> allTasksStage = null);
         allTasksStage.show();
 
