@@ -16,7 +16,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.CheckBox;/
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -225,7 +225,11 @@ public class TaskNotificationApp extends Application {
         editButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
         editButton.setOnAction(event -> showEditTaskDialog(taskTable.getSelectionModel().getSelectedItem()));
 
-        HBox actions = new HBox(8, addButton, editButton);
+        Button deleteButton = new Button("Delete Task");
+        deleteButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
+        deleteButton.setOnAction(event -> deleteSelectedTask(taskTable.getSelectionModel().getSelectedItem()));
+
+        HBox actions = new HBox(8, addButton, editButton, deleteButton);
         actions.getStyleClass().add("actions");
         return actions;
     }
@@ -284,6 +288,7 @@ public class TaskNotificationApp extends Application {
             }
         });
     }
+    
 
     private void showEditTaskDialog(Task task) {
         Optional<TaskFormData> result = showTaskDialog("Edit Task", task);
@@ -304,6 +309,7 @@ public class TaskNotificationApp extends Application {
             }
         });
     }
+    
 
     private Optional<TaskFormData> showTaskDialog(String title, Task task) {
         Dialog<TaskFormData> dialog = new Dialog<>();
@@ -428,6 +434,31 @@ public class TaskNotificationApp extends Application {
         } catch (SQLException exception) {
             showError("Could not update the task.");
             refreshOpenWindows();
+        }
+    }
+    
+
+    /* thêm nhận dạng nút delete */
+    private void deleteSelectedTask(Task task) {
+        if (task == null) {
+            return;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Delete");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to delete \"" + task.taskDescription() + "\"?");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                taskRepository.delete(task.id());
+                refreshOpenWindows();
+                deadlineNotificationService.checkNow();
+            } catch (SQLException exception) {
+                showError("Could not delete the task.");
+                refreshOpenWindows();
+            }
         }
     }
 
