@@ -16,7 +16,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckBox;/
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -40,6 +40,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import javafx.scene.image.Image; 
+
 
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
@@ -91,6 +92,12 @@ public class TaskNotificationApp extends Application {
         stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
         stage.setScene(scene);
         stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
+        stage.setOnCloseRequest(event -> {
+            if (allTasksStage != null && allTasksStage.isShowing()) {
+                event.consume();
+                java.awt.Toolkit.getDefaultToolkit().beep();
+            }
+        });
         stage.show();
 
         loadMainTasks();
@@ -302,6 +309,7 @@ public class TaskNotificationApp extends Application {
         Dialog<TaskFormData> dialog = new Dialog<>();
         dialog.setTitle(title);
         dialog.setHeaderText(null);
+        
 
         ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
