@@ -43,6 +43,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import javafx.scene.image.Image; 
+
 
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
@@ -94,6 +96,13 @@ public class TaskNotificationApp extends Application {
         stage.setMinWidth(480);
         stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
         stage.setScene(scene);
+        stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
+        stage.setOnCloseRequest(event -> {
+            if (allTasksStage != null && allTasksStage.isShowing()) {
+                event.consume();
+                java.awt.Toolkit.getDefaultToolkit().beep();
+            }
+        });
         stage.show();
 
         loadMainTasks();
@@ -225,6 +234,11 @@ public class TaskNotificationApp extends Application {
         exportButton.setOnAction(event -> exportTasksToExcel());
 
         HBox actions = new HBox(8, addButton, editButton, exportButton);
+        Button deleteButton = new Button("Delete Task");
+        deleteButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
+        deleteButton.setOnAction(event -> deleteSelectedTask(taskTable.getSelectionModel().getSelectedItem()));
+
+        HBox actions = new HBox(8, addButton, editButton, deleteButton);
         actions.getStyleClass().add("actions");
         return actions;
     }
@@ -259,6 +273,7 @@ public class TaskNotificationApp extends Application {
         allTasksStage.setMinWidth(760);
         allTasksStage.setMinHeight(420);
         allTasksStage.setScene(scene);
+        allTasksStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/list-icon.png")));
         allTasksStage.setOnCloseRequest(event -> allTasksStage = null);
         allTasksStage.show();
 
@@ -282,6 +297,7 @@ public class TaskNotificationApp extends Application {
             }
         });
     }
+    
 
     private void showEditTaskDialog(Task task) {
         Optional<TaskFormData> result = showTaskDialog("Edit Task", task);
@@ -302,11 +318,13 @@ public class TaskNotificationApp extends Application {
             }
         });
     }
+    
 
     private Optional<TaskFormData> showTaskDialog(String title, Task task) {
         Dialog<TaskFormData> dialog = new Dialog<>();
         dialog.setTitle(title);
         dialog.setHeaderText(null);
+        
 
         ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
@@ -447,6 +465,31 @@ public class TaskNotificationApp extends Application {
         } catch (SQLException exception) {
             showError("Could not update the task.");
             refreshOpenWindows();
+        }
+    }
+    
+
+    /* thêm nhận dạng nút delete */
+    private void deleteSelectedTask(Task task) {
+        if (task == null) {
+            return;
+        }
+
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Confirm Delete");
+        alert.setHeaderText(null);
+        alert.setContentText("Are you sure you want to delete \"" + task.taskDescription() + "\"?");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            try {
+                taskRepository.delete(task.id());
+                refreshOpenWindows();
+                deadlineNotificationService.checkNow();
+            } catch (SQLException exception) {
+                showError("Could not delete the task.");
+                refreshOpenWindows();
+            }
         }
     }
 

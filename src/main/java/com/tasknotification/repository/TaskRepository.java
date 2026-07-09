@@ -209,6 +209,18 @@ public class TaskRepository {
             statement.setLong(2, taskId);
             statement.executeUpdate();
         }
+        
+    }
+
+
+    public void delete(long taskId) throws SQLException {
+        String sql = "DELETE FROM tasks WHERE id = ?";
+
+        try (Connection connection = connectionFactory.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, taskId);
+            statement.executeUpdate();
+        }
     }
 
     private Task mapTask(ResultSet resultSet) throws SQLException {
