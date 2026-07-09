@@ -1,19 +1,15 @@
 package com.tasknotification.startup;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.net.URISyntaxException;
 import java.util.Locale;
 
 /**
  * Registers the packaged application to launch when the current user signs in.
  */
 public final class WindowsStartupRegistration {
-    private static final String RUN_KEY =
-            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    private static final String VALUE_NAME = "TaskNotificationApp";
-
     private WindowsStartupRegistration() {
     }
 
@@ -27,24 +23,28 @@ public final class WindowsStartupRegistration {
             return;
         }
 
+        String appData = System.getenv("APPDATA");
+        if (appData == null || appData.isBlank()) {
+            return;
+        }
+
+        Path startupDirectory = Path.of(
+                appData,
+                "Microsoft",
+                "Windows",
+                "Start Menu",
+                "Programs",
+                "Startup"
+        );
+        Path startupScript = startupDirectory.resolve("TaskNotificationApp.cmd");
         String executable = executablePath.toAbsolutePath().normalize().toString();
+        String script = "@echo off\r\nstart \"\" \"" + executable + "\" --background\r\n";
+
         try {
-            new ProcessBuilder(
-                    "reg.exe",
-                    "add",
-                    RUN_KEY,
-                    "/v",
-                    VALUE_NAME,
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    executable,
-                    "/f"
-            ).start().waitFor();
+            Files.createDirectories(startupDirectory);
+            Files.writeString(startupScript, script, StandardCharsets.UTF_8);
         } catch (IOException exception) {
             System.err.println("Could not register the app for Windows startup: " + exception.getMessage());
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
         }
     }
 
@@ -55,40 +55,6 @@ public final class WindowsStartupRegistration {
     }
 
     private static Path findPackagedExecutable() {
-        String appPath = System.getProperty("jpackage.app-path");
-        if (appPath != null && !appPath.isBlank()) {
-            return Path.of(appPath);
-        }
-
-        String command = ProcessHandle.current().info().command().orElse("");
-        if (!command.isBlank()) {
-            Path commandPath = Path.of(command);
-            String fileName = commandPath.getFileName().toString().toLowerCase(Locale.ROOT);
-            if (fileName.endsWith(".exe")
-                    && !fileName.equals("java.exe")
-                    && !fileName.equals("javaw.exe")) {
-                return commandPath;
-            }
-        }
-
-        try {
-            Path codeLocation = Path.of(
-                    WindowsStartupRegistration.class.getProtectionDomain()
-                            .getCodeSource()
-                            .getLocation()
-                            .toURI()
-            );
-            Path appDirectory = codeLocation.getParent();
-            if (appDirectory != null && appDirectory.getParent() != null) {
-                Path packagedLauncher = appDirectory.getParent().resolve("Task Notification.exe");
-                if (Files.isRegularFile(packagedLauncher)) {
-                    return packagedLauncher;
-                }
-            }
-        } catch (URISyntaxException exception) {
-            return null;
-        }
-
         Path javaHome = Path.of(System.getProperty("java.home", ""));
         Path appDirectory = javaHome.getParent();
         if (appDirectory == null) {

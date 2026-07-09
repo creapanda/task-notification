@@ -5,7 +5,10 @@ import com.tasknotification.repository.TaskRepository;
 
 import java.awt.AWTException;
 import java.awt.Image;
+import java.awt.MenuItem;
+import java.awt.PopupMenu;
 import java.awt.SystemTray;
+import java.awt.Toolkit;
 import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
 import java.sql.SQLException;
@@ -31,6 +34,10 @@ public class DeadlineNotificationService {
     private final TaskRepository taskRepository;
     private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private final Set<String> sentNotifications = ConcurrentHashMap.newKeySet();
+    private Runnable openAction = () -> {
+    };
+    private Runnable exitAction = () -> {
+    };
     private TrayIcon trayIcon;
 
     public DeadlineNotificationService(TaskRepository taskRepository) {
@@ -48,6 +55,18 @@ public class DeadlineNotificationService {
         if (trayIcon != null && SystemTray.isSupported()) {
             SystemTray.getSystemTray().remove(trayIcon);
         }
+    }
+
+    public void setOpenAction(Runnable openAction) {
+        this.openAction = openAction;
+    }
+
+    public void setExitAction(Runnable exitAction) {
+        this.exitAction = exitAction;
+    }
+
+    public boolean isTrayAvailable() {
+        return trayIcon != null;
     }
 
     public void checkNow() {
@@ -99,15 +118,40 @@ public class DeadlineNotificationService {
             return;
         }
 
-        Image image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+        Image image = loadTrayImage();
         trayIcon = new TrayIcon(image, "Task Notification");
         trayIcon.setImageAutoSize(true);
+        trayIcon.setPopupMenu(buildTrayMenu());
+        trayIcon.addActionListener(event -> openAction.run());
 
         try {
             SystemTray.getSystemTray().add(trayIcon);
         } catch (AWTException exception) {
             trayIcon = null;
         }
+    }
+
+    private PopupMenu buildTrayMenu() {
+        PopupMenu menu = new PopupMenu();
+
+        MenuItem openItem = new MenuItem("Open Task Notification");
+        openItem.addActionListener(event -> openAction.run());
+
+        MenuItem exitItem = new MenuItem("Exit");
+        exitItem.addActionListener(event -> exitAction.run());
+
+        menu.add(openItem);
+        menu.addSeparator();
+        menu.add(exitItem);
+        return menu;
+    }
+
+    private Image loadTrayImage() {
+        java.net.URL iconUrl = DeadlineNotificationService.class.getResource("/images/app-icon.png");
+        if (iconUrl != null) {
+            return Toolkit.getDefaultToolkit().getImage(iconUrl);
+        }
+        return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
     }
 
     private void showNotification(String title, String message) {

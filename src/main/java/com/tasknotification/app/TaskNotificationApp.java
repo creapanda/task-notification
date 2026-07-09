@@ -6,6 +6,7 @@ import com.tasknotification.notification.DeadlineNotificationService;
 import com.tasknotification.repository.TaskRepository;
 import com.tasknotification.service.TaskExcelExporter;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -72,6 +73,7 @@ public class TaskNotificationApp extends Application {
 
     @Override
     public void start(Stage stage) {
+        Platform.setImplicitExit(false);
         mainStage = stage;
         mainTaskTable = buildMainTaskTable();
         HBox actions = buildMainActions();
@@ -104,15 +106,21 @@ public class TaskNotificationApp extends Application {
         stage.setScene(scene);
         stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
         stage.setOnCloseRequest(event -> {
-            if (allTasksStage != null && allTasksStage.isShowing()) {
-                event.consume();
-                java.awt.Toolkit.getDefaultToolkit().beep();
+            if (!deadlineNotificationService.isTrayAvailable()) {
+                return;
             }
+            event.consume();
+            hideTaskWindows();
         });
-        stage.show();
 
+        deadlineNotificationService.setOpenAction(() -> Platform.runLater(this::showMainWindow));
+        deadlineNotificationService.setExitAction(() -> Platform.runLater(this::exitApplication));
         loadMainTasks();
         deadlineNotificationService.start();
+
+        if (!isBackgroundStart() || !deadlineNotificationService.isTrayAvailable()) {
+            stage.show();
+        }
     }
 
     private HBox buildMainActions() {
@@ -127,6 +135,31 @@ public class TaskNotificationApp extends Application {
     @Override
     public void stop() {
         deadlineNotificationService.stop();
+    }
+
+    private boolean isBackgroundStart() {
+        return getParameters().getRaw().contains("--background");
+    }
+
+    private void showMainWindow() {
+        loadMainTasks();
+        mainStage.show();
+        mainStage.toFront();
+        mainStage.requestFocus();
+    }
+
+    private void hideTaskWindows() {
+        if (allTasksStage != null) {
+            allTasksStage.close();
+        }
+        mainStage.hide();
+    }
+
+    private void exitApplication() {
+        if (allTasksStage != null) {
+            allTasksStage.close();
+        }
+        Platform.exit();
     }
 
     private TableView<Task> buildMainTaskTable() {
