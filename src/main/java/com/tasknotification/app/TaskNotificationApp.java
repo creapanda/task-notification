@@ -46,6 +46,12 @@ import java.util.Optional;
 import javafx.scene.image.Image; 
 
 
+/**
+ * Builds the JavaFX interface and coordinates task operations.
+ *
+ * <p>The main window shows up to three unfinished tasks. The second window
+ * provides the complete task list and task-management actions.</p>
+ */
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private static final int MAIN_TASK_LIMIT = 3;
@@ -189,6 +195,7 @@ public class TaskNotificationApp extends Application {
             private final CheckBox completedCheckBox = new CheckBox();
 
             {
+                // Confirm the change before writing the completed state to SQLite.
                 completedCheckBox.setOnAction(event -> {
                     Task task = getTableRow().getItem();
                     if (task == null) {
@@ -434,6 +441,7 @@ public class TaskNotificationApp extends Application {
             return;
         }
 
+        // Keep one row for the empty-table message, otherwise fit the loaded tasks.
         int visibleRows = Math.max(1, Math.min(MAIN_TASK_LIMIT, taskCount));
         double tableHeight = MAIN_TABLE_HEADER_HEIGHT + (visibleRows * MAIN_ROW_HEIGHT);
         if (mainTaskTable != null) {

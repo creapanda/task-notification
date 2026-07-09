@@ -9,6 +9,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Creates the database directory and applies the schema when the app starts.
+ */
 public final class DatabaseInitializer {
     private static final Path SCHEMA_PATH = Path.of("database", "schema.sql");
 
@@ -37,6 +40,7 @@ public final class DatabaseInitializer {
     }
 
     private static String readSchema() throws IOException {
+        // The bundled schema supports packaged builds; the file fallback supports development.
         try (InputStream inputStream = DatabaseInitializer.class.getResourceAsStream("/database/schema.sql")) {
             if (inputStream != null) {
                 return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
