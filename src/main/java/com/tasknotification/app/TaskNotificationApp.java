@@ -232,13 +232,11 @@ public class TaskNotificationApp extends Application {
 
         Button exportButton = new Button("Export Excel");
         exportButton.setOnAction(event -> exportTasksToExcel());
-
-        HBox actions = new HBox(8, addButton, editButton, exportButton);
         Button deleteButton = new Button("Delete Task");
         deleteButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
         deleteButton.setOnAction(event -> deleteSelectedTask(taskTable.getSelectionModel().getSelectedItem()));
 
-        HBox actions = new HBox(8, addButton, editButton, deleteButton);
+        HBox actions = new HBox(8, addButton, editButton, exportButton, deleteButton);
         actions.getStyleClass().add("actions");
         return actions;
     }
