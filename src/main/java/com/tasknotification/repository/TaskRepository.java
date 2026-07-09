@@ -84,6 +84,33 @@ public class TaskRepository {
         return tasks;
     }
 
+    public List<Task> findCompleted() throws SQLException {
+        String sql = """
+                SELECT id,
+                       date_created,
+                       person,
+                       task_description,
+                       deadline,
+                       completed
+                FROM tasks
+                WHERE completed = 1
+                ORDER BY
+                    CASE WHEN deadline IS NULL OR deadline = '' THEN 1 ELSE 0 END,
+                    deadline ASC,
+                    id DESC
+                """;
+
+        List<Task> tasks = new ArrayList<>();
+        try (Connection connection = connectionFactory.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(sql)) {
+            while (resultSet.next()) {
+                tasks.add(mapTask(resultSet));
+            }
+        }
+        return tasks;
+    }
+
     public List<Task> findUnfinishedDueWithin(LocalDateTime now, Duration duration) throws SQLException {
         String sql = """
                 SELECT id,

@@ -4,6 +4,7 @@ import com.tasknotification.database.DatabaseInitializer;
 import com.tasknotification.model.Task;
 import com.tasknotification.notification.DeadlineNotificationService;
 import com.tasknotification.repository.TaskRepository;
+import com.tasknotification.service.TaskExcelExporter;
 import javafx.application.Application;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -24,6 +25,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.stage.FileChooser;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -32,6 +34,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 
+import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,6 +56,7 @@ public class TaskNotificationApp extends Application {
 
     private final TaskRepository taskRepository = new TaskRepository();
     private final DeadlineNotificationService deadlineNotificationService = new DeadlineNotificationService(taskRepository);
+    private final TaskExcelExporter taskExcelExporter = new TaskExcelExporter();
     private final ObservableList<Task> mainTasks = FXCollections.observableArrayList();
     private final ObservableList<Task> allTasks = FXCollections.observableArrayList();
     private final Label allTasksStatusLabel = new Label();
@@ -225,6 +230,10 @@ public class TaskNotificationApp extends Application {
         editButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
         editButton.setOnAction(event -> showEditTaskDialog(taskTable.getSelectionModel().getSelectedItem()));
 
+        Button exportButton = new Button("Export Excel");
+        exportButton.setOnAction(event -> exportTasksToExcel());
+
+        HBox actions = new HBox(8, addButton, editButton, exportButton);
         Button deleteButton = new Button("Delete Task");
         deleteButton.disableProperty().bind(taskTable.getSelectionModel().selectedItemProperty().isNull());
         deleteButton.setOnAction(event -> deleteSelectedTask(taskTable.getSelectionModel().getSelectedItem()));
@@ -390,6 +399,28 @@ public class TaskNotificationApp extends Application {
         } catch (SQLException exception) {
             allTasksStatusLabel.setText("Could not load tasks from the database.");
             throw new IllegalStateException("Failed to load tasks", exception);
+        }
+    }
+
+    private void exportTasksToExcel() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Tasks to Excel");
+        fileChooser.setInitialFileName("tasks.xlsx");
+        fileChooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Excel Workbook (*.xlsx)", "*.xlsx")
+        );
+
+        File selectedFile = fileChooser.showSaveDialog(allTasksStage);
+        if (selectedFile == null) {
+            return;
+        }
+
+        try {
+            DatabaseInitializer.initialize();
+            List<Task> databaseTasks = taskRepository.findCompleted();
+            taskExcelExporter.export(databaseTasks, selectedFile.toPath());
+        } catch (SQLException | IOException exception) {
+            showError("Could not export tasks to Excel.");
         }
     }
 
