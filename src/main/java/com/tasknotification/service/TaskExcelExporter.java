@@ -16,6 +16,9 @@ import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Writes task data to an Excel workbook at the path selected by the user.
+ */
 public class TaskExcelExporter {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private static final String[] HEADERS = {

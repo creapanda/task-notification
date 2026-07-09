@@ -4,6 +4,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
+/**
+ * Opens connections to the application's SQLite database.
+ */
 public final class DatabaseConnection {
     private DatabaseConnection() {
     }

@@ -19,6 +19,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Checks unfinished tasks and sends desktop notifications for deadlines
+ * within the 12-hour and 24-hour notification windows.
+ */
 public class DeadlineNotificationService {
     private static final Duration TWELVE_HOURS = Duration.ofHours(12);
     private static final Duration TWENTY_FOUR_HOURS = Duration.ofHours(24);
@@ -63,6 +67,7 @@ public class DeadlineNotificationService {
     private void notifyDueTasksOutsideTwelveHours(LocalDateTime now) throws SQLException {
         List<Task> tasks = taskRepository.findUnfinishedDueWithin(now, TWENTY_FOUR_HOURS);
         for (Task task : tasks) {
+            // Exclude the inner window because those tasks receive the 12-hour message.
             if (task.deadline() != null && task.deadline().isAfter(now.plus(TWELVE_HOURS))) {
                 notifyTask(task, 24);
             }
@@ -77,6 +82,7 @@ public class DeadlineNotificationService {
 
     private void notifyTask(Task task, int hours) {
         String notificationKey = task.id() + ":" + hours;
+        // Send each threshold notification only once per task during this app session.
         if (!sentNotifications.add(notificationKey)) {
             return;
         }

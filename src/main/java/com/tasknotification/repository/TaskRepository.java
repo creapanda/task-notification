@@ -16,6 +16,9 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Reads and writes task records in SQLite using prepared JDBC statements.
+ */
 public class TaskRepository {
     private final ConnectionFactory connectionFactory;
 
@@ -239,6 +242,7 @@ public class TaskRepository {
             return null;
         }
 
+        // Accept both SQLite's space separator and Java's ISO "T" separator.
         String normalizedValue = value.trim().replace(" ", "T");
         try {
             return LocalDateTime.parse(normalizedValue);
