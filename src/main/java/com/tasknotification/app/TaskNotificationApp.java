@@ -245,6 +245,7 @@ public class TaskNotificationApp extends Application {
 
             {
                 setAlignment(Pos.CENTER_LEFT);
+                // Text nodes wrap cleanly and allow the table row to grow with long content.
                 wrappedText.getStyleClass().add("wrapped-cell-text");
                 wrappedText.setLineSpacing(2);
                 wrappedText.wrappingWidthProperty().bind(widthProperty().subtract(18));
@@ -519,6 +520,7 @@ public class TaskNotificationApp extends Application {
             return;
         }
 
+        // Match the compact main window height to the text-wrapped task rows.
         double rowsHeight = estimateMainRowsHeight(tasks);
         double tableHeight = MAIN_TABLE_HEADER_HEIGHT + rowsHeight;
         if (mainTaskTable != null) {
@@ -543,6 +545,7 @@ public class TaskNotificationApp extends Application {
     }
 
     private double estimateMainRowHeight(Task task) {
+        // Use the tallest wrapped text column so person/task text never overlaps.
         int personLines = estimateWrappedLines(task.person(), MAIN_PERSON_CHARS_PER_LINE);
         int taskLines = estimateWrappedLines(task.taskDescription(), MAIN_TASK_CHARS_PER_LINE);
         int rowLines = Math.max(personLines, taskLines);

@@ -71,6 +71,7 @@
 }
 
 .main-table .wrapped-cell-text {
+    /* Match wrapped Text nodes to normal table-cell text styling. */
     -fx-fill: #1f2933;
 }
 
