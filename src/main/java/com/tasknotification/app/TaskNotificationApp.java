@@ -45,6 +45,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import javafx.scene.image.Image; 
+import javax.swing.JOptionPane;
 
 
 /**
@@ -54,8 +55,9 @@ import javafx.scene.image.Image;
  * provides the complete task list and task-management actions.</p>
  */
 public class TaskNotificationApp extends Application {
-    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
+    
     private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd MMM yyyy");
+    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private static final int MAIN_TASK_LIMIT = 3;
     private static final double MAIN_WINDOW_WIDTH = 520;
     private static final double MAIN_WINDOW_BASE_HEIGHT = 128;
@@ -170,6 +172,11 @@ public class TaskNotificationApp extends Application {
         table.getStyleClass().add("main-table");
         table.setFixedCellSize(MAIN_ROW_HEIGHT);
         table.setMinHeight(MAIN_TABLE_HEADER_HEIGHT + MAIN_ROW_HEIGHT);
+        
+        TableColumn<Task, String> personColumn = new TableColumn<>("Person");
+        personColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().person()));
+        personColumn.setPrefWidth(140);
+
 
         TableColumn<Task, String> taskColumn = new TableColumn<>("Task");
         taskColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().taskDescription()));
@@ -179,6 +186,7 @@ public class TaskNotificationApp extends Application {
         deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDate(cell.getValue().deadline())));
         deadlineColumn.setPrefWidth(140);
 
+        table.getColumns().add(personColumn);
         table.getColumns().add(taskColumn);
         table.getColumns().add(deadlineColumn);
         table.getColumns().add(buildCompletedColumn());
