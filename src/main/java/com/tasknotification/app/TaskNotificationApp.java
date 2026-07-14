@@ -55,6 +55,7 @@ import javafx.scene.image.Image;
  */
 public class TaskNotificationApp extends Application {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
+    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd MMM yyyy");
     private static final int MAIN_TASK_LIMIT = 3;
     private static final double MAIN_WINDOW_WIDTH = 520;
     private static final double MAIN_WINDOW_BASE_HEIGHT = 128;
@@ -175,7 +176,7 @@ public class TaskNotificationApp extends Application {
         taskColumn.setPrefWidth(280);
 
         TableColumn<Task, String> deadlineColumn = new TableColumn<>("Deadline");
-        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
+        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDate(cell.getValue().deadline())));
         deadlineColumn.setPrefWidth(140);
 
         table.getColumns().add(taskColumn);
@@ -208,7 +209,7 @@ public class TaskNotificationApp extends Application {
         taskColumn.setPrefWidth(260);
 
         TableColumn<Task, String> deadlineColumn = new TableColumn<>("Deadline");
-        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
+        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDate(cell.getValue().deadline())));
         deadlineColumn.setPrefWidth(160);
 
         table.getColumns().add(idColumn);
@@ -534,6 +535,10 @@ public class TaskNotificationApp extends Application {
 
     private String formatDateTime(java.time.LocalDateTime dateTime) {
         return dateTime == null ? "" : DISPLAY_DATE_TIME.format(dateTime);
+    }
+
+    private String formatDate(java.time.LocalDateTime dateTime) {
+        return dateTime == null ? "" : DISPLAY_DATE.format(dateTime);
     }
 
     private LocalDate toLocalDate(LocalDateTime dateTime) {
