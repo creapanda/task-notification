@@ -66,11 +66,15 @@ public class DeadlineNotificationService {
     }
 
     public boolean isTrayAvailable() {
+        return isTrayReady();
+    }
+
+    boolean isTrayReady() {
         return trayIcon != null;
     }
 
     public void checkNow() {
-        if (trayIcon == null) {
+        if (!isTrayReady()) {
             return;
         }
 
@@ -154,7 +158,7 @@ public class DeadlineNotificationService {
         return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
     }
 
-    private void showNotification(String title, String message) {
+    void showNotification(String title, String message) {
         if (trayIcon != null) {
             trayIcon.displayMessage(title, message, TrayIcon.MessageType.INFO);
         }
