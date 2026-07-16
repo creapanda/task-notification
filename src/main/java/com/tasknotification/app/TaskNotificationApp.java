@@ -23,6 +23,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
@@ -33,6 +34,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.Region;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
 import java.io.File;
@@ -45,6 +47,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import javafx.scene.image.Image; 
+import javax.swing.JOptionPane;
 
 
 /**
@@ -54,12 +57,18 @@ import javafx.scene.image.Image;
  * provides the complete task list and task-management actions.</p>
  */
 public class TaskNotificationApp extends Application {
+    
+    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd MMM yyyy");
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private static final int MAIN_TASK_LIMIT = 3;
     private static final double MAIN_WINDOW_WIDTH = 520;
     private static final double MAIN_WINDOW_BASE_HEIGHT = 128;
-    private static final double MAIN_ROW_HEIGHT = 38;
+    private static final double MAIN_MIN_ROW_HEIGHT = 38;
     private static final double MAIN_TABLE_HEADER_HEIGHT = 32;
+    private static final double MAIN_ROW_VERTICAL_PADDING = 18;
+    private static final double MAIN_TEXT_LINE_HEIGHT = 18;
+    private static final int MAIN_PERSON_CHARS_PER_LINE = 16;
+    private static final int MAIN_TASK_CHARS_PER_LINE = 36;
 
     private final TaskRepository taskRepository = new TaskRepository();
     private final DeadlineNotificationService deadlineNotificationService = new DeadlineNotificationService(taskRepository);
@@ -97,12 +106,12 @@ public class TaskNotificationApp extends Application {
         root.setCenter(mainTaskTable);
         root.getStyleClass().add("main-root");
 
-        Scene scene = new Scene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
+        Scene scene = new Scene(root, MAIN_WINDOW_WIDTH, MAIN_WINDOW_BASE_HEIGHT + MAIN_MIN_ROW_HEIGHT);
         scene.getStylesheets().add(getClass().getResource("/com/tasknotification/styles/main.css").toExternalForm());
 
         stage.setTitle("Main");
         stage.setMinWidth(480);
-        stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_ROW_HEIGHT);
+        stage.setMinHeight(MAIN_WINDOW_BASE_HEIGHT + MAIN_MIN_ROW_HEIGHT);
         stage.setScene(scene);
         stage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
         stage.setOnCloseRequest(event -> {
@@ -167,17 +176,24 @@ public class TaskNotificationApp extends Application {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("No unfinished tasks found."));
         table.getStyleClass().add("main-table");
-        table.setFixedCellSize(MAIN_ROW_HEIGHT);
-        table.setMinHeight(MAIN_TABLE_HEADER_HEIGHT + MAIN_ROW_HEIGHT);
+        table.setMinHeight(MAIN_TABLE_HEADER_HEIGHT + MAIN_MIN_ROW_HEIGHT);
+        
+        TableColumn<Task, String> personColumn = new TableColumn<>("Person");
+        personColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().person()));
+        personColumn.setPrefWidth(140);
+        useWrappingTextCells(personColumn);
+
 
         TableColumn<Task, String> taskColumn = new TableColumn<>("Task");
         taskColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().taskDescription()));
         taskColumn.setPrefWidth(280);
+        useWrappingTextCells(taskColumn);
 
         TableColumn<Task, String> deadlineColumn = new TableColumn<>("Deadline");
-        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
+        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDate(cell.getValue().deadline())));
         deadlineColumn.setPrefWidth(140);
 
+        table.getColumns().add(personColumn);
         table.getColumns().add(taskColumn);
         table.getColumns().add(deadlineColumn);
         table.getColumns().add(buildCompletedColumn());
@@ -202,13 +218,15 @@ public class TaskNotificationApp extends Application {
         TableColumn<Task, String> personColumn = new TableColumn<>("Person");
         personColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().person()));
         personColumn.setPrefWidth(140);
+        useWrappingTextCells(personColumn);
 
         TableColumn<Task, String> taskColumn = new TableColumn<>("Task");
         taskColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().taskDescription()));
         taskColumn.setPrefWidth(260);
+        useWrappingTextCells(taskColumn);
 
         TableColumn<Task, String> deadlineColumn = new TableColumn<>("Deadline");
-        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().deadline())));
+        deadlineColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDate(cell.getValue().deadline())));
         deadlineColumn.setPrefWidth(160);
 
         table.getColumns().add(idColumn);
@@ -219,6 +237,34 @@ public class TaskNotificationApp extends Application {
         table.getColumns().add(buildCompletedColumn());
 
         return table;
+    }
+
+    private void useWrappingTextCells(TableColumn<Task, String> column) {
+        column.setCellFactory(ignoredColumn -> new TableCell<>() {
+            private final Text wrappedText = new Text();
+
+            {
+                setAlignment(Pos.CENTER_LEFT);
+                // Text nodes wrap cleanly and allow the table row to grow with long content.
+                wrappedText.getStyleClass().add("wrapped-cell-text");
+                wrappedText.setLineSpacing(2);
+                wrappedText.wrappingWidthProperty().bind(widthProperty().subtract(18));
+            }
+
+            @Override
+            protected void updateItem(String text, boolean empty) {
+                super.updateItem(text, empty);
+                if (empty || text == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+
+                wrappedText.setText(text);
+                setText(null);
+                setGraphic(wrappedText);
+            }
+        });
     }
 
     private TableColumn<Task, Boolean> buildCompletedColumn() {
@@ -420,7 +466,7 @@ public class TaskNotificationApp extends Application {
             DatabaseInitializer.initialize();
             List<Task> databaseTasks = taskRepository.findClosestUnfinished(MAIN_TASK_LIMIT);
             mainTasks.setAll(databaseTasks);
-            resizeMainWindow(databaseTasks.size());
+            resizeMainWindow(databaseTasks);
         } catch (SQLException exception) {
             throw new IllegalStateException("Failed to load tasks", exception);
         }
@@ -469,21 +515,53 @@ public class TaskNotificationApp extends Application {
         }
     }
 
-    private void resizeMainWindow(int taskCount) {
+    private void resizeMainWindow(List<Task> tasks) {
         if (mainStage == null) {
             return;
         }
 
-        // Keep one row for the empty-table message, otherwise fit the loaded tasks.
-        int visibleRows = Math.max(1, Math.min(MAIN_TASK_LIMIT, taskCount));
-        double tableHeight = MAIN_TABLE_HEADER_HEIGHT + (visibleRows * MAIN_ROW_HEIGHT);
+        // Match the compact main window height to the text-wrapped task rows.
+        double rowsHeight = estimateMainRowsHeight(tasks);
+        double tableHeight = MAIN_TABLE_HEADER_HEIGHT + rowsHeight;
         if (mainTaskTable != null) {
             mainTaskTable.setPrefHeight(tableHeight);
             mainTaskTable.setMaxHeight(tableHeight);
         }
 
         mainStage.setWidth(MAIN_WINDOW_WIDTH);
-        mainStage.setHeight(MAIN_WINDOW_BASE_HEIGHT + (visibleRows * MAIN_ROW_HEIGHT));
+        mainStage.setHeight(MAIN_WINDOW_BASE_HEIGHT + rowsHeight);
+    }
+
+    private double estimateMainRowsHeight(List<Task> tasks) {
+        if (tasks.isEmpty()) {
+            return MAIN_MIN_ROW_HEIGHT;
+        }
+
+        double rowsHeight = 0;
+        for (Task task : tasks) {
+            rowsHeight += estimateMainRowHeight(task);
+        }
+        return rowsHeight;
+    }
+
+    private double estimateMainRowHeight(Task task) {
+        // Use the tallest wrapped text column so person/task text never overlaps.
+        int personLines = estimateWrappedLines(task.person(), MAIN_PERSON_CHARS_PER_LINE);
+        int taskLines = estimateWrappedLines(task.taskDescription(), MAIN_TASK_CHARS_PER_LINE);
+        int rowLines = Math.max(personLines, taskLines);
+        return Math.max(MAIN_MIN_ROW_HEIGHT, MAIN_ROW_VERTICAL_PADDING + (rowLines * MAIN_TEXT_LINE_HEIGHT));
+    }
+
+    private int estimateWrappedLines(String text, int charactersPerLine) {
+        if (text == null || text.isBlank()) {
+            return 1;
+        }
+
+        int lineCount = 0;
+        for (String line : text.split("\\R", -1)) {
+            lineCount += Math.max(1, (line.length() + charactersPerLine - 1) / charactersPerLine);
+        }
+        return lineCount;
     }
 
     private boolean confirmCompletedChange(Task task, boolean completed) {
@@ -534,6 +612,10 @@ public class TaskNotificationApp extends Application {
 
     private String formatDateTime(java.time.LocalDateTime dateTime) {
         return dateTime == null ? "" : DISPLAY_DATE_TIME.format(dateTime);
+    }
+
+    private String formatDate(java.time.LocalDateTime dateTime) {
+        return dateTime == null ? "" : DISPLAY_DATE.format(dateTime);
     }
 
     private LocalDate toLocalDate(LocalDateTime dateTime) {
