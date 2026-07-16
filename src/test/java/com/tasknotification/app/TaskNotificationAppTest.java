@@ -49,10 +49,10 @@ class TaskNotificationAppTest {
 
     // ── Private method signatures (via reflection) ───────────────────
 
-    // Note: Verifies that the private formatDateTime method exists with the expected signature.
+    // Note: Verifies that the private formatDate method exists with the expected signature.
     @Test
-    void formatDateTimeMethodExists() throws NoSuchMethodException {
-        Method method = TaskNotificationApp.class.getDeclaredMethod("formatDateTime", LocalDateTime.class);
+    void formatDateMethodExists() throws NoSuchMethodException {
+        Method method = TaskNotificationApp.class.getDeclaredMethod("formatDate", LocalDateTime.class);
 
         assertEquals(String.class, method.getReturnType());
     }
@@ -110,13 +110,49 @@ class TaskNotificationAppTest {
         assertEquals(128.0, field.getDouble(null));
     }
 
-    // Note: Verifies that MAIN_ROW_HEIGHT constant is set to 38.
+    // Note: Verifies that MAIN_MIN_ROW_HEIGHT constant is set to 38.
     @Test
-    void mainRowHeightIs38() throws Exception {
-        Field field = TaskNotificationApp.class.getDeclaredField("MAIN_ROW_HEIGHT");
+    void mainMinRowHeightIs38() throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField("MAIN_MIN_ROW_HEIGHT");
         field.setAccessible(true);
 
         assertEquals(38.0, field.getDouble(null));
+    }
+
+    // Note: Verifies that MAIN_ROW_VERTICAL_PADDING constant is set to 18.
+    @Test
+    void mainRowVerticalPaddingIs18() throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField("MAIN_ROW_VERTICAL_PADDING");
+        field.setAccessible(true);
+
+        assertEquals(18.0, field.getDouble(null));
+    }
+
+    // Note: Verifies that MAIN_TEXT_LINE_HEIGHT constant is set to 18.
+    @Test
+    void mainTextLineHeightIs18() throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField("MAIN_TEXT_LINE_HEIGHT");
+        field.setAccessible(true);
+
+        assertEquals(18.0, field.getDouble(null));
+    }
+
+    // Note: Verifies that MAIN_PERSON_CHARS_PER_LINE constant is set to 16.
+    @Test
+    void mainPersonCharsPerLineIs16() throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField("MAIN_PERSON_CHARS_PER_LINE");
+        field.setAccessible(true);
+
+        assertEquals(16, field.getInt(null));
+    }
+
+    // Note: Verifies that MAIN_TASK_CHARS_PER_LINE constant is set to 36.
+    @Test
+    void mainTaskCharsPerLineIs36() throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField("MAIN_TASK_CHARS_PER_LINE");
+        field.setAccessible(true);
+
+        assertEquals(36, field.getInt(null));
     }
 
     // Note: Verifies that MAIN_TABLE_HEADER_HEIGHT constant is set to 32.
@@ -128,14 +164,16 @@ class TaskNotificationAppTest {
         assertEquals(32.0, field.getDouble(null));
     }
 
-    // Note: Verifies that the DISPLAY_DATE_TIME formatter formats dates correctly (starts with "dd MMM yyyy").
+
+
+    // Note: Verifies that the DISPLAY_DATE formatter formats dates correctly (starts with "dd MMM yyyy").
     @Test
-    void displayDateTimeFormatterUsesExpectedPattern() throws Exception {
-        Field field = TaskNotificationApp.class.getDeclaredField("DISPLAY_DATE_TIME");
+    void displayDateFormatterUsesExpectedPattern() throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField("DISPLAY_DATE");
         field.setAccessible(true);
 
         java.time.format.DateTimeFormatter formatter = (java.time.format.DateTimeFormatter) field.get(null);
-        LocalDateTime sample = LocalDateTime.of(2026, 1, 5, 8, 3);
+        LocalDate sample = LocalDate.of(2026, 1, 5);
 
         String formatted = formatter.format(sample);
         assertTrue(formatted.startsWith("05 Jan 2026"));
