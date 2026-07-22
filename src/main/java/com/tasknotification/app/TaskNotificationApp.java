@@ -59,7 +59,6 @@ import javax.swing.JOptionPane;
 public class TaskNotificationApp extends Application {
     
     private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd MMM yyyy");
-    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm");
     private static final int MAIN_TASK_LIMIT = 3;
     private static final double MAIN_WINDOW_WIDTH = 520;
     private static final double MAIN_WINDOW_BASE_HEIGHT = 128;
@@ -212,7 +211,7 @@ public class TaskNotificationApp extends Application {
         idColumn.setMaxWidth(80);
 
         TableColumn<Task, String> createdColumn = new TableColumn<>("Created");
-        createdColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDateTime(cell.getValue().dateCreated())));
+        createdColumn.setCellValueFactory(cell -> new ReadOnlyStringWrapper(formatDate(cell.getValue().dateCreated())));
         createdColumn.setPrefWidth(150);
 
         TableColumn<Task, String> personColumn = new TableColumn<>("Person");
@@ -610,9 +609,7 @@ public class TaskNotificationApp extends Application {
         }
     }
 
-    private String formatDateTime(java.time.LocalDateTime dateTime) {
-        return dateTime == null ? "" : DISPLAY_DATE_TIME.format(dateTime);
-    }
+
 
     private String formatDate(java.time.LocalDateTime dateTime) {
         return dateTime == null ? "" : DISPLAY_DATE.format(dateTime);

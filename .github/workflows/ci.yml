@@ -12,8 +12,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build and Test
+  test:
+    name: Run Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -24,11 +24,38 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "24"
           cache: maven
 
-      - name: Verify project
-        run: mvn --batch-mode --update-snapshots verify
+      - name: Run Maven tests
+        run: mvn --batch-mode test
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+          if-no-files-found: ignore
+
+  build:
+    name: Build Package
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "24"
+          cache: maven
+
+      - name: Package project
+        run: mvn --batch-mode package -DskipTests
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -54,11 +81,11 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "24"
           cache: maven
 
       - name: Package application
-        run: mvn --batch-mode package
+        run: mvn --batch-mode package -DskipTests
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
