@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 /**
  * Checks unfinished tasks and sends desktop notifications for deadlines
@@ -38,6 +39,12 @@ public class DeadlineNotificationService {
     };
     private Runnable exitAction = () -> {
     };
+    private Runnable toggleStartupAction = () -> {
+    };
+    private Runnable uninstallAction = () -> {
+    };
+    private BooleanSupplier startupEnabledSupplier = () -> false;
+    private MenuItem startupItem;
     private TrayIcon trayIcon;
 
     public DeadlineNotificationService(TaskRepository taskRepository) {
@@ -63,6 +70,25 @@ public class DeadlineNotificationService {
 
     public void setExitAction(Runnable exitAction) {
         this.exitAction = exitAction;
+    }
+
+    public void setToggleStartupAction(Runnable toggleStartupAction) {
+        this.toggleStartupAction = toggleStartupAction;
+    }
+
+    public void setUninstallAction(Runnable uninstallAction) {
+        this.uninstallAction = uninstallAction;
+    }
+
+    public void setStartupEnabledSupplier(BooleanSupplier startupEnabledSupplier) {
+        this.startupEnabledSupplier = startupEnabledSupplier;
+        updateStartupMenuLabel();
+    }
+
+    public void updateStartupMenuLabel() {
+        if (startupItem != null) {
+            startupItem.setLabel(startupEnabledSupplier.getAsBoolean() ? "Turn Off Startup" : "Turn On Startup");
+        }
     }
 
     public boolean isTrayAvailable() {
@@ -141,10 +167,19 @@ public class DeadlineNotificationService {
         MenuItem openItem = new MenuItem("Open Task Notification");
         openItem.addActionListener(event -> openAction.run());
 
+        startupItem = new MenuItem();
+        updateStartupMenuLabel();
+        startupItem.addActionListener(event -> toggleStartupAction.run());
+
+        MenuItem uninstallItem = new MenuItem("Delete App");
+        uninstallItem.addActionListener(event -> uninstallAction.run());
+
         MenuItem exitItem = new MenuItem("Exit");
         exitItem.addActionListener(event -> exitAction.run());
 
         menu.add(openItem);
+        menu.add(startupItem);
+        menu.add(uninstallItem);
         menu.addSeparator();
         menu.add(exitItem);
         return menu;
@@ -156,6 +191,10 @@ public class DeadlineNotificationService {
             return Toolkit.getDefaultToolkit().getImage(iconUrl);
         }
         return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+    }
+
+    public void showStatusNotification(String title, String message) {
+        showNotification(title, message);
     }
 
     void showNotification(String title, String message) {

@@ -5,6 +5,7 @@ import com.tasknotification.model.Task;
 import com.tasknotification.notification.DeadlineNotificationService;
 import com.tasknotification.repository.TaskRepository;
 import com.tasknotification.service.TaskExcelExporter;
+import com.tasknotification.startup.WindowsStartupRegistration;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
@@ -123,6 +124,9 @@ public class TaskNotificationApp extends Application {
 
         deadlineNotificationService.setOpenAction(() -> Platform.runLater(this::showMainWindow));
         deadlineNotificationService.setExitAction(() -> Platform.runLater(this::exitApplication));
+        deadlineNotificationService.setStartupEnabledSupplier(WindowsStartupRegistration::isStartupEnabled);
+        deadlineNotificationService.setToggleStartupAction(this::toggleStartup);
+        deadlineNotificationService.setUninstallAction(() -> Platform.runLater(this::uninstallApp));
         loadMainTasks();
         deadlineNotificationService.start();
 
@@ -168,6 +172,46 @@ public class TaskNotificationApp extends Application {
             allTasksStage.close();
         }
         Platform.exit();
+    }
+
+    private void toggleStartup() {
+        boolean startupEnabled = WindowsStartupRegistration.isStartupEnabled();
+        boolean changed = startupEnabled
+                ? WindowsStartupRegistration.disableStartup()
+                : WindowsStartupRegistration.enableStartup();
+
+        deadlineNotificationService.updateStartupMenuLabel();
+        deadlineNotificationService.showStatusNotification(
+                "Task Notification",
+                startupMessage(startupEnabled, changed)
+        );
+    }
+
+    private String startupMessage(boolean wasEnabled, boolean changed) {
+        if (!changed) {
+            return wasEnabled ? "Could not turn off startup." : "Could not turn on startup.";
+        }
+
+        return wasEnabled ? "Startup has been turned off." : "Startup has been turned on.";
+    }
+
+    private void uninstallApp() {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Delete App");
+        alert.setHeaderText("Delete Task Notification from this computer?");
+        alert.setContentText("This removes the packaged app folder after the app closes. Your database inside that folder will also be deleted.");
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isEmpty() || result.get() != ButtonType.OK) {
+            return;
+        }
+
+        if (WindowsStartupRegistration.uninstallPackagedApp()) {
+            exitApplication();
+            return;
+        }
+
+        showError("Could not delete the app folder. This only works from the packaged app.");
     }
 
     private TableView<Task> buildMainTaskTable() {
