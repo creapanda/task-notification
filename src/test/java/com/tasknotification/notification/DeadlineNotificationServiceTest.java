@@ -259,6 +259,127 @@ class DeadlineNotificationServiceTest {
         brokenService.stop();
     }
 
+    // ── showStatusNotification() ─────────────────────────────────
+
+    // Note: Verifies that showStatusNotification delegates to showNotification with the same title and message.
+    @Test
+    void showStatusNotificationDelegatesToShowNotification() {
+        notificationService.simulateStart();
+
+        notificationService.showStatusNotification("Info", "All tasks are on track.");
+
+        List<String[]> notifications = notificationService.getNotifications();
+        assertEquals(1, notifications.size());
+        assertEquals("Info", notifications.getFirst()[0]);
+        assertEquals("All tasks are on track.", notifications.getFirst()[1]);
+    }
+
+    // Note: Verifies that showStatusNotification with empty strings records an entry with both fields empty.
+    @Test
+    void showStatusNotificationWithEmptyStrings() {
+        notificationService.simulateStart();
+
+        notificationService.showStatusNotification("", "");
+
+        List<String[]> notifications = notificationService.getNotifications();
+        assertEquals(1, notifications.size());
+        assertEquals("", notifications.getFirst()[0]);
+        assertEquals("", notifications.getFirst()[1]);
+    }
+
+    // Note: Verifies that showStatusNotification always delegates to showNotification regardless of tray state.
+    //       In production, showNotification checks trayIcon != null; in tests the override always records the call.
+    @Test
+    void showStatusNotificationAlwaysDelegatesToShowNotification() {
+        notificationService.showStatusNotification("Status", "Message");
+
+        List<String[]> notifications = notificationService.getNotifications();
+        assertEquals(1, notifications.size());
+        assertEquals("Status", notifications.getFirst()[0]);
+        assertEquals("Message", notifications.getFirst()[1]);
+    }
+
+    // ── setToggleStartupAction() ─────────────────────────────────
+
+    // Note: Verifies that setToggleStartupAction stores the callback and it can be triggered.
+    @Test
+    void setToggleStartupActionStoresCallback() {
+        boolean[] called = {false};
+
+        notificationService.setToggleStartupAction(() -> called[0] = true);
+        notificationService.triggerToggleStartupAction();
+
+        assertTrue(called[0]);
+    }
+
+    // Note: Verifies that the default toggleStartupAction (no-op) does not throw when triggered.
+    @Test
+    void defaultToggleStartupActionDoesNotThrow() {
+        // No action was set — the default no-op should execute without exception.
+        try {
+            notificationService.triggerToggleStartupAction();
+        } catch (Exception exception) {
+            throw new AssertionError("Default toggleStartupAction should not throw", exception);
+        }
+    }
+
+    // ── setUninstallAction() ────────────────────────────────────
+
+    // Note: Verifies that setUninstallAction stores the callback and it can be triggered.
+    @Test
+    void setUninstallActionStoresCallback() {
+        boolean[] called = {false};
+
+        notificationService.setUninstallAction(() -> called[0] = true);
+        notificationService.triggerUninstallAction();
+
+        assertTrue(called[0]);
+    }
+
+    // Note: Verifies that the default uninstallAction (no-op) does not throw when triggered.
+    @Test
+    void defaultUninstallActionDoesNotThrow() {
+        try {
+            notificationService.triggerUninstallAction();
+        } catch (Exception exception) {
+            throw new AssertionError("Default uninstallAction should not throw", exception);
+        }
+    }
+
+    // ── setStartupEnabledSupplier() / updateStartupMenuLabel() ───────────
+
+    // Note: Verifies that setStartupEnabledSupplier stores the supplier without throwing.
+    @Test
+    void setStartupEnabledSupplierDoesNotThrow() {
+        // startupItem is null (tray not initialized), so updateStartupMenuLabel is a no-op — must not throw.
+        try {
+            notificationService.setStartupEnabledSupplier(() -> true);
+        } catch (Exception exception) {
+            throw new AssertionError("setStartupEnabledSupplier should not throw", exception);
+        }
+    }
+
+    // Note: Verifies that setStartupEnabledSupplier with a false supplier also does not throw.
+    @Test
+    void setStartupEnabledSupplierWithFalseSupplierDoesNotThrow() {
+        try {
+            notificationService.setStartupEnabledSupplier(() -> false);
+        } catch (Exception exception) {
+            throw new AssertionError("setStartupEnabledSupplier(false) should not throw", exception);
+        }
+    }
+
+    // Note: Verifies that updateStartupMenuLabel does not throw when the tray icon is not initialized.
+    @Test
+    void updateStartupMenuLabelDoesNotThrowWhenTrayNotInitialized() {
+        // startupItem is null before start() — method must guard against NPE.
+        try {
+            notificationService.updateStartupMenuLabel();
+        } catch (Exception exception) {
+            throw new AssertionError("updateStartupMenuLabel should not throw when tray is absent", exception);
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════
     // Testable subclass: overrides tray-dependent methods so tests can
     // run in headless CI environments without AWT SystemTray support.
@@ -269,6 +390,8 @@ class DeadlineNotificationServiceTest {
         private boolean traySimulated = false;
         private Runnable openAction = () -> {};
         private Runnable exitAction = () -> {};
+        private Runnable toggleStartupAction = () -> {};
+        private Runnable uninstallAction = () -> {};
 
         TestableNotificationService(TaskRepository taskRepository) {
             super(taskRepository);
@@ -307,12 +430,32 @@ class DeadlineNotificationServiceTest {
             super.setExitAction(action);
         }
 
+        @Override
+        public void setToggleStartupAction(Runnable action) {
+            this.toggleStartupAction = action;
+            super.setToggleStartupAction(action);
+        }
+
+        @Override
+        public void setUninstallAction(Runnable action) {
+            this.uninstallAction = action;
+            super.setUninstallAction(action);
+        }
+
         void triggerOpenAction() {
             openAction.run();
         }
 
         void triggerExitAction() {
             exitAction.run();
+        }
+
+        void triggerToggleStartupAction() {
+            toggleStartupAction.run();
+        }
+
+        void triggerUninstallAction() {
+            uninstallAction.run();
         }
 
         List<String[]> getNotifications() {

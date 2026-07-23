@@ -1,5 +1,7 @@
 package com.tasknotification.app;
 
+import com.tasknotification.model.Task;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -7,12 +9,53 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskNotificationAppTest {
+
+    private static final LocalDateTime SAMPLE_DATE = LocalDateTime.of(2026, 7, 1, 9, 0);
+    private static final LocalDateTime SAMPLE_DEADLINE = LocalDateTime.of(2026, 7, 10, 17, 0);
+
+    /**
+     * Creates a TaskNotificationApp instance without invoking the constructor,
+     * bypassing JavaFX field initializers so pure-logic private methods can be tested
+     * in a headless environment without a running JavaFX toolkit.
+     */
+    private static TaskNotificationApp allocateApp() throws Exception {
+        sun.misc.Unsafe unsafe = getUnsafe();
+        return (TaskNotificationApp) unsafe.allocateInstance(TaskNotificationApp.class);
+    }
+
+    private static sun.misc.Unsafe getUnsafe() throws Exception {
+        java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        f.setAccessible(true);
+        return (sun.misc.Unsafe) f.get(null);
+    }
+
+    // Helper: invoke a declared (possibly private) method on the given instance via reflection.
+    private static Object invokePrivate(Object instance, String methodName, Class<?>[] paramTypes, Object... args) throws Exception {
+        Method method = TaskNotificationApp.class.getDeclaredMethod(methodName, paramTypes);
+        method.setAccessible(true);
+        return method.invoke(instance, args);
+    }
+
+    // Helper: read a static int constant declared on TaskNotificationApp.
+    private static int readStaticInt(String fieldName) throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getInt(null);
+    }
+
+    // Helper: read a static double constant declared on TaskNotificationApp.
+    private static double readStaticDouble(String fieldName) throws Exception {
+        Field field = TaskNotificationApp.class.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.getDouble(null);
+    }
 
     // ── Class structure ──────────────────────────────────────────────
 
@@ -166,6 +209,29 @@ class TaskNotificationAppTest {
 
 
 
+    // ── formatDate() (via reflection) ────────────────────────────────
+
+    // Note: Verifies that formatDate returns an empty string when passed null.
+    @Test
+    void formatDateReturnsEmptyStringForNull() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String result = (String) invokePrivate(app, "formatDate",
+                new Class<?>[] {LocalDateTime.class}, (Object) null);
+
+        assertEquals("", result);
+    }
+
+    // Note: Verifies that formatDate returns a correctly formatted string ("dd MMM yyyy") for a valid LocalDateTime.
+    @Test
+    void formatDateReturnsFormattedStringForNonNull() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        LocalDateTime dt = LocalDateTime.of(2026, 7, 5, 14, 30);
+        String result = (String) invokePrivate(app, "formatDate",
+                new Class<?>[] {LocalDateTime.class}, dt);
+
+        assertEquals("05 Jul 2026", result);
+    }
+
     // Note: Verifies that the DISPLAY_DATE formatter formats dates correctly (starts with "dd MMM yyyy").
     @Test
     void displayDateFormatterUsesExpectedPattern() throws Exception {
@@ -211,6 +277,215 @@ class TaskNotificationAppTest {
         for (int i = 0; i < expectedNames.length; i++) {
             assertEquals(expectedNames[i], components[i].getName());
         }
+    }
+
+    // ── estimateWrappedLines() (via reflection) ──────────────────────
+
+    // Note: Verifies that a null text returns 1 line.
+    @Test
+    void estimateWrappedLinesReturnsOneForNullText() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, null, 16);
+
+        assertEquals(1, result);
+    }
+
+    // Note: Verifies that a blank text returns 1 line.
+    @Test
+    void estimateWrappedLinesReturnsOneForBlankText() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, "   ", 16);
+
+        assertEquals(1, result);
+    }
+
+    // Note: Verifies that text shorter than charsPerLine occupies exactly 1 line.
+    @Test
+    void estimateWrappedLinesReturnsOneForShortText() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, "Short", 16);
+
+        assertEquals(1, result);
+    }
+
+    // Note: Verifies that text exactly equal to charsPerLine occupies 1 line.
+    @Test
+    void estimateWrappedLinesReturnsOneForExactLength() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String text = "a".repeat(16);
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, text, 16);
+
+        assertEquals(1, result);
+    }
+
+    // Note: Verifies that text one character longer than charsPerLine wraps into 2 lines.
+    @Test
+    void estimateWrappedLinesReturnsTwoWhenTextExceedsOneLine() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String text = "a".repeat(17);
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, text, 16);
+
+        assertEquals(2, result);
+    }
+
+    // Note: Verifies that a text with two physical newlines counts as 3 lines minimum.
+    @Test
+    void estimateWrappedLinesCountsPhysicalNewlines() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String text = "Line1\nLine2\nLine3";
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, text, 100);
+
+        assertEquals(3, result);
+    }
+
+    // Note: Verifies that combined newlines and long segments are counted together.
+    @Test
+    void estimateWrappedLinesCombinesNewlinesAndWrapping() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        // Two lines: first wraps to 2 chunks of 16, second is short
+        String text = "a".repeat(32) + "\n" + "b".repeat(5);
+        int result = (int) invokePrivate(app, "estimateWrappedLines",
+                new Class<?>[] {String.class, int.class}, text, 16);
+
+        assertEquals(3, result);
+    }
+
+    // ── estimateMainRowHeight() (via reflection) ──────────────────────
+
+    // Note: Verifies that a task with short person and task text returns the minimum row height.
+    @Test
+    void estimateMainRowHeightReturnsMinimumForShortText() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Task task = new Task(1, SAMPLE_DATE, "Alex", "Fix bug", SAMPLE_DEADLINE, false);
+        double minRowHeight = readStaticDouble("MAIN_MIN_ROW_HEIGHT");
+
+        double result = (double) invokePrivate(app, "estimateMainRowHeight",
+                new Class<?>[] {Task.class}, task);
+
+        assertEquals(minRowHeight, result);
+    }
+
+    // Note: Verifies that a task with a long task description causes the row height to exceed the minimum.
+    @Test
+    void estimateMainRowHeightExceedsMinimumForLongTaskText() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        // 37 chars wraps to 2 lines with charsPerLine=36
+        String longTask = "a".repeat(37);
+        Task task = new Task(1, SAMPLE_DATE, "Alex", longTask, SAMPLE_DEADLINE, false);
+        double minRowHeight = readStaticDouble("MAIN_MIN_ROW_HEIGHT");
+
+        double result = (double) invokePrivate(app, "estimateMainRowHeight",
+                new Class<?>[] {Task.class}, task);
+
+        assertTrue(result > minRowHeight);
+    }
+
+    // Note: Verifies that a task where person wraps more than task drives the row height.
+    @Test
+    void estimateMainRowHeightUsesMaxOfPersonAndTask() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        // Person is 17 chars -> 2 lines with charsPerLine=16; task is short -> 1 line
+        String longPerson = "a".repeat(17);
+        Task task = new Task(1, SAMPLE_DATE, longPerson, "Short", SAMPLE_DEADLINE, false);
+        double rowVertPad = readStaticDouble("MAIN_ROW_VERTICAL_PADDING");
+        double textLineH = readStaticDouble("MAIN_TEXT_LINE_HEIGHT");
+        double expectedHeight = rowVertPad + (2 * textLineH);
+
+        double result = (double) invokePrivate(app, "estimateMainRowHeight",
+                new Class<?>[] {Task.class}, task);
+
+        assertEquals(expectedHeight, result, 0.001);
+    }
+
+    // ── estimateMainRowsHeight() (via reflection) ─────────────────────
+
+    // Note: Verifies that an empty task list returns the minimum row height.
+    @Test
+    void estimateMainRowsHeightReturnsMinRowHeightForEmptyList() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        double minRowHeight = readStaticDouble("MAIN_MIN_ROW_HEIGHT");
+
+        double result = (double) invokePrivate(app, "estimateMainRowsHeight",
+                new Class<?>[] {List.class}, List.of());
+
+        assertEquals(minRowHeight, result);
+    }
+
+    // Note: Verifies that a single short-text task returns its single row height.
+    @Test
+    void estimateMainRowsHeightReturnsSingleRowHeightForOneTask() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Task task = new Task(1, SAMPLE_DATE, "Alex", "Fix bug", SAMPLE_DEADLINE, false);
+        double singleHeight = (double) invokePrivate(app, "estimateMainRowHeight",
+                new Class<?>[] {Task.class}, task);
+
+        double result = (double) invokePrivate(app, "estimateMainRowsHeight",
+                new Class<?>[] {List.class}, List.of(task));
+
+        assertEquals(singleHeight, result, 0.001);
+    }
+
+    // Note: Verifies that two tasks sum their individual row heights.
+    @Test
+    void estimateMainRowsHeightSumsHeightsForMultipleTasks() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Task task1 = new Task(1, SAMPLE_DATE, "Alex", "Fix bug", SAMPLE_DEADLINE, false);
+        Task task2 = new Task(2, SAMPLE_DATE, "Sam", "a".repeat(37), SAMPLE_DEADLINE, false);
+        double h1 = (double) invokePrivate(app, "estimateMainRowHeight", new Class<?>[] {Task.class}, task1);
+        double h2 = (double) invokePrivate(app, "estimateMainRowHeight", new Class<?>[] {Task.class}, task2);
+
+        double result = (double) invokePrivate(app, "estimateMainRowsHeight",
+                new Class<?>[] {List.class}, List.of(task1, task2));
+
+        assertEquals(h1 + h2, result, 0.001);
+    }
+
+    // ── startupMessage() (via reflection) ────────────────────────────
+
+    // Note: Verifies that startupMessage returns correct message when startup was enabled and change succeeded.
+    @Test
+    void startupMessageWhenWasEnabledAndChanged() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String result = (String) invokePrivate(app, "startupMessage",
+                new Class<?>[] {boolean.class, boolean.class}, true, true);
+
+        assertEquals("Startup has been turned off.", result);
+    }
+
+    // Note: Verifies that startupMessage returns correct message when startup was disabled and change succeeded.
+    @Test
+    void startupMessageWhenWasDisabledAndChanged() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String result = (String) invokePrivate(app, "startupMessage",
+                new Class<?>[] {boolean.class, boolean.class}, false, true);
+
+        assertEquals("Startup has been turned on.", result);
+    }
+
+    // Note: Verifies that startupMessage returns failure message when startup was enabled but change failed.
+    @Test
+    void startupMessageWhenWasEnabledAndNotChanged() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String result = (String) invokePrivate(app, "startupMessage",
+                new Class<?>[] {boolean.class, boolean.class}, true, false);
+
+        assertEquals("Could not turn off startup.", result);
+    }
+
+    // Note: Verifies that startupMessage returns failure message when startup was disabled but change failed.
+    @Test
+    void startupMessageWhenWasDisabledAndNotChanged() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        String result = (String) invokePrivate(app, "startupMessage",
+                new Class<?>[] {boolean.class, boolean.class}, false, false);
+
+        assertEquals("Could not turn on startup.", result);
     }
 
     // ── Helper ───────────────────────────────────────────────────────

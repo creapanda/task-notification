@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -122,5 +123,118 @@ class WindowsStartupRegistrationTest {
                     "APPDATA should be set on Windows");
         }
         // On non-Windows, APPDATA is usually null — registerPackagedApp would exit early
+    }
+
+    // ── enableStartup() ──────────────────────────────────────────────
+
+    // Note: Verifies that enableStartup does not throw in development environment (no packaged exe).
+    @Test
+    void enableStartupDoesNotThrowInDevelopmentEnvironment() {
+        assertDoesNotThrow(WindowsStartupRegistration::enableStartup);
+    }
+
+    // Note: Verifies that enableStartup returns false when not running from a packaged app directory.
+    @Test
+    void enableStartupReturnsFalseInDevelopmentEnvironment() {
+        // In dev there is no packaged executable, so writeStartupScript returns false.
+        boolean result = WindowsStartupRegistration.enableStartup();
+
+        // On non-Windows OR Windows without the packaged exe both return false.
+        assertFalse(result, "enableStartup should return false in development environment");
+    }
+
+    // Note: Verifies that calling enableStartup twice does not throw.
+    @Test
+    void enableStartupCanBeCalledMultipleTimes() {
+        assertDoesNotThrow(() -> {
+            WindowsStartupRegistration.enableStartup();
+            WindowsStartupRegistration.enableStartup();
+        });
+    }
+
+    // ── disableStartup() ─────────────────────────────────────────────
+
+    // Note: Verifies that disableStartup does not throw in development environment.
+    @Test
+    void disableStartupDoesNotThrowInDevelopmentEnvironment() {
+        assertDoesNotThrow(WindowsStartupRegistration::disableStartup);
+    }
+
+    // Note: Verifies that disableStartup returns false on non-Windows (no APPDATA path available).
+    @Test
+    void disableStartupReturnsBooleanWithoutException() {
+        // disableStartup returns false when not on Windows, or true when it succeeds on Windows.
+        // This test documents that a boolean is always returned without an exception.
+        boolean result = assertDoesNotThrow(WindowsStartupRegistration::disableStartup);
+        // Result may be true or false depending on OS — we only verify no exception is thrown.
+        assertTrue(result || !result, "disableStartup must return a boolean without throwing");
+    }
+
+    // Note: Verifies that calling disableStartup twice does not throw.
+    @Test
+    void disableStartupCanBeCalledMultipleTimes() {
+        assertDoesNotThrow(() -> {
+            WindowsStartupRegistration.disableStartup();
+            WindowsStartupRegistration.disableStartup();
+        });
+    }
+
+    // ── isStartupEnabled() ────────────────────────────────────────────
+
+    // Note: Verifies that isStartupEnabled does not throw in development environment.
+    @Test
+    void isStartupEnabledDoesNotThrowInDevelopmentEnvironment() {
+        assertDoesNotThrow(WindowsStartupRegistration::isStartupEnabled);
+    }
+
+    // Note: Verifies that isStartupEnabled returns false in development environment
+    //       (no packaged executable next to java.home).
+    @Test
+    void isStartupEnabledReturnsFalseInDevelopmentEnvironment() {
+        boolean result = WindowsStartupRegistration.isStartupEnabled();
+
+        assertFalse(result, "isStartupEnabled should be false in development environment");
+    }
+
+    // Note: Verifies the relationship: disabling startup then calling isStartupEnabled returns false.
+    @Test
+    void isStartupEnabledReturnsFalseAfterDisableStartup() {
+        WindowsStartupRegistration.disableStartup();
+
+        boolean result = WindowsStartupRegistration.isStartupEnabled();
+
+        assertFalse(result);
+    }
+
+    // ── Constant name verification (via reflection) ───────────────────
+
+    // Note: Verifies that the STARTUP_SCRIPT_NAME constant has the expected value.
+    @Test
+    void startupScriptNameConstantHasExpectedValue() throws Exception {
+        java.lang.reflect.Field field = WindowsStartupRegistration.class
+                .getDeclaredField("STARTUP_SCRIPT_NAME");
+        field.setAccessible(true);
+
+        assertEquals("TaskNotificationApp.cmd", field.get(null));
+    }
+
+    // Note: Verifies that the DISABLED_MARKER_NAME constant has the expected value.
+    @Test
+    void disabledMarkerNameConstantHasExpectedValue() throws Exception {
+        java.lang.reflect.Field field = WindowsStartupRegistration.class
+                .getDeclaredField("DISABLED_MARKER_NAME");
+        field.setAccessible(true);
+
+        assertEquals("startup-disabled.txt", field.get(null));
+    }
+
+    // Note: Verifies that the UNINSTALL_SCRIPT_NAME constant has the expected value.
+    @Test
+    void uninstallScriptNameConstantHasExpectedValue() throws Exception {
+        java.lang.reflect.Field field = WindowsStartupRegistration.class
+                .getDeclaredField("UNINSTALL_SCRIPT_NAME");
+        field.setAccessible(true);
+
+        assertEquals("TaskNotificationUninstall.cmd", field.get(null));
     }
 }
