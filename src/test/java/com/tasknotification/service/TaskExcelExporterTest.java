@@ -4,6 +4,8 @@ import com.tasknotification.model.Task;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFChart;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -241,6 +243,47 @@ class TaskExcelExporterTest {
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(outputPath))) {
             assertEquals("", workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue());
+        }
+    }
+
+    // Verify that export() creates a summary sheet for the Excel chart data.
+    @Test
+    void exportCreatesSummarySheetWithCompletedTaskCountsByPerson() throws Exception {
+        Path outputPath = temporaryDirectory.resolve("summary-chart-data.xlsx");
+        List<Task> tasks = List.of(
+                new Task(1, LocalDateTime.now(), "Alex", "Task A", LocalDateTime.now(), true),
+                new Task(2, LocalDateTime.now(), "Alex", "Task B", LocalDateTime.now(), true),
+                new Task(3, LocalDateTime.now(), "Sam", "Task C", LocalDateTime.now(), true)
+        );
+
+        exporter.export(tasks, outputPath);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(outputPath))) {
+            Sheet summarySheet = workbook.getSheet("Summary");
+
+            assertEquals("Person", summarySheet.getRow(0).getCell(0).getStringCellValue());
+            assertEquals("Completed Tasks", summarySheet.getRow(0).getCell(1).getStringCellValue());
+            assertEquals("Alex", summarySheet.getRow(1).getCell(0).getStringCellValue());
+            assertEquals(2, (int) summarySheet.getRow(1).getCell(1).getNumericCellValue());
+            assertEquals("Sam", summarySheet.getRow(2).getCell(0).getStringCellValue());
+            assertEquals(1, (int) summarySheet.getRow(2).getCell(1).getNumericCellValue());
+        }
+    }
+
+    // Verify that the summary sheet contains an actual Excel chart object.
+    @Test
+    void exportCreatesExcelChartOnSummarySheet() throws Exception {
+        Path outputPath = temporaryDirectory.resolve("summary-chart.xlsx");
+        Task task = new Task(1, LocalDateTime.now(), "Alex", "Task", LocalDateTime.now(), true);
+
+        exporter.export(List.of(task), outputPath);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(outputPath))) {
+            XSSFDrawing drawing = workbook.getSheet("Summary").getDrawingPatriarch();
+            List<XSSFChart> charts = drawing.getCharts();
+
+            assertEquals(1, charts.size());
+            assertEquals("Completed Tasks by Person", charts.getFirst().getTitleText().toString());
         }
     }
 }

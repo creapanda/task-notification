@@ -12,6 +12,7 @@ import java.util.Locale;
 public final class WindowsStartupRegistration {
     private static final String STARTUP_SCRIPT_NAME = "TaskNotificationApp.cmd";
     private static final String DISABLED_MARKER_NAME = "startup-disabled.txt";
+    private static final String INSTALLED_MARKER_NAME = "installed-path.txt";
     private static final String UNINSTALL_SCRIPT_NAME = "TaskNotificationUninstall.cmd";
 
     private WindowsStartupRegistration() {
@@ -22,6 +23,7 @@ public final class WindowsStartupRegistration {
             return;
         }
 
+        saveInstalledPath();
         writeStartupScript();
     }
 
@@ -40,11 +42,25 @@ public final class WindowsStartupRegistration {
             return false;
         }
 
+        saveInstalledPath();
         return writeStartupScript();
     }
 
     public static boolean isStartupEnabled() {
         return isWindows() && !isStartupDisabled() && findPackagedExecutable() != null;
+    }
+
+    public static boolean isAppInstalled() {
+        if (!isWindows()) {
+            return false;
+        }
+
+        Path installedExecutable = readInstalledExecutablePath();
+        if (installedExecutable != null && Files.isRegularFile(installedExecutable)) {
+            return true;
+        }
+
+        return findPackagedExecutable() != null;
     }
 
     private static boolean writeStartupScript() {
@@ -108,6 +124,7 @@ public final class WindowsStartupRegistration {
         }
 
         disableStartup();
+        deleteInstalledPath();
 
         Path appDirectory = findPackagedAppDirectory();
         if (appDirectory == null) {
@@ -192,5 +209,57 @@ public final class WindowsStartupRegistration {
         }
 
         return Path.of(appData, "TaskNotification", DISABLED_MARKER_NAME);
+    }
+
+    private static void saveInstalledPath() {
+        Path executablePath = findPackagedExecutable();
+        Path installedMarker = installedMarkerPath();
+        if (executablePath == null || installedMarker == null) {
+            return;
+        }
+
+        try {
+            Files.createDirectories(installedMarker.getParent());
+            Files.writeString(installedMarker, executablePath.toAbsolutePath().normalize().toString(), StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            System.err.println("Could not save the installed app path: " + exception.getMessage());
+        }
+    }
+
+    private static Path readInstalledExecutablePath() {
+        Path installedMarker = installedMarkerPath();
+        if (installedMarker == null || !Files.isRegularFile(installedMarker)) {
+            return null;
+        }
+
+        try {
+            String installedPath = Files.readString(installedMarker, StandardCharsets.UTF_8).trim();
+            return installedPath.isEmpty() ? null : Path.of(installedPath);
+        } catch (IOException exception) {
+            System.err.println("Could not read the installed app path: " + exception.getMessage());
+            return null;
+        }
+    }
+
+    private static void deleteInstalledPath() {
+        Path installedMarker = installedMarkerPath();
+        if (installedMarker == null) {
+            return;
+        }
+
+        try {
+            Files.deleteIfExists(installedMarker);
+        } catch (IOException exception) {
+            System.err.println("Could not remove the installed app path: " + exception.getMessage());
+        }
+    }
+
+    private static Path installedMarkerPath() {
+        String appData = System.getenv("APPDATA");
+        if (appData == null || appData.isBlank()) {
+            return null;
+        }
+
+        return Path.of(appData, "TaskNotification", INSTALLED_MARKER_NAME);
     }
 }

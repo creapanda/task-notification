@@ -233,6 +233,8 @@ Exported columns:
 
 The UI currently passes completed tasks only.
 
+The workbook also includes a `Summary` sheet with an Excel bar chart showing completed task counts by person.
+
 ## Startup And Uninstall API
 
 ### `WindowsStartupRegistration`
@@ -266,6 +268,12 @@ public static boolean isStartupEnabled()
 Returns whether startup is currently enabled for the packaged app.
 
 ```java
+public static boolean isAppInstalled()
+```
+
+Returns whether the packaged app appears to be installed on this Windows user account.
+
+```java
 public static boolean uninstallPackagedApp()
 ```
 
@@ -294,6 +302,7 @@ Supported command-line options:
 - `--background`: Start hidden in the system tray.
 - `--disable-startup`: Turn off Windows startup and exit.
 - `--enable-startup`: Turn on Windows startup and exit.
+- `--check-installed`: Print `installed` or `not installed`, then exit.
 - `--uninstall-app`: Schedule packaged app folder deletion and exit.
 
 ### `TaskNotificationApp`
