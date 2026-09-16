@@ -1,16 +1,39 @@
 package com.tasknotification.app;
 
+import com.tasknotification.startup.StartupStateBackup;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskNotificationLauncherTest {
+
+    // main() delegates straight to WindowsStartupRegistration, which writes to the current user's
+    // real %APPDATA% folders, so every test runs against a snapshot that is put back afterwards.
+    private StartupStateBackup startupStateBackup;
+
+    @BeforeEach
+    void captureRealStartupState() throws Exception {
+        startupStateBackup = StartupStateBackup.capture();
+    }
+
+    @AfterEach
+    void restoreRealStartupState() throws Exception {
+        startupStateBackup.restore();
+    }
 
     // Note: Verifies that TaskNotificationLauncher class exists and can be loaded.
     @Test
@@ -44,60 +67,87 @@ class TaskNotificationLauncherTest {
         assertEquals(void.class, mainMethod.getReturnType());
     }
 
-    // Note: Verifies that the constructor exists and is accessible (not private utility class pattern).
-    @Test
-    void constructorIsAccessible() {
-        assertNotNull(TaskNotificationLauncher.class.getConstructors());
-        assertTrue(TaskNotificationLauncher.class.getConstructors().length > 0);
-    }
-
     // ── main() argument handling ────────────────────────────────────────
 
     // Note: Verifies that passing --disable-startup argument does not throw an exception.
     @Test
     void mainWithDisableStartupArgDoesNotThrow() {
-        // This tests that the branch executes without exception; actual registry
-        // side-effects are tested in WindowsStartupRegistrationTest.
-        try {
-            TaskNotificationLauncher.main(new String[] {"--disable-startup"});
-        } catch (Exception exception) {
-            // Only expect this if disableStartup itself throws, which it should not.
-            throw new AssertionError("main(--disable-startup) should not throw", exception);
-        }
+        assertDoesNotThrow(() -> TaskNotificationLauncher.main(new String[] {"--disable-startup"}));
+    }
+
+    // Note: Verifies that --disable-startup actually routes to disableStartup by checking that the
+    //       disabled marker file is written.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void mainWithDisableStartupArgDisablesStartup() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.deleteIfExists(disabledMarker);
+
+        TaskNotificationLauncher.main(new String[] {"--disable-startup"});
+
+        assertTrue(Files.isRegularFile(disabledMarker),
+                "--disable-startup should write the disabled marker");
     }
 
     // Note: Verifies that passing --enable-startup argument does not throw an exception.
     @Test
     void mainWithEnableStartupArgDoesNotThrow() {
-        try {
-            TaskNotificationLauncher.main(new String[] {"--enable-startup"});
-        } catch (Exception exception) {
-            throw new AssertionError("main(--enable-startup) should not throw", exception);
-        }
+        assertDoesNotThrow(() -> TaskNotificationLauncher.main(new String[] {"--enable-startup"}));
+    }
+
+    // Note: Verifies that --enable-startup actually routes to enableStartup by checking that the
+    //       disabled marker file is removed.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void mainWithEnableStartupArgEnablesStartup() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.createDirectories(disabledMarker.getParent());
+        Files.writeString(disabledMarker, "disabled");
+
+        TaskNotificationLauncher.main(new String[] {"--enable-startup"});
+
+        assertFalse(Files.isRegularFile(disabledMarker),
+                "--enable-startup should remove the disabled marker");
     }
 
     // Note: Verifies that passing --uninstall-app argument does not throw an exception.
     @Test
     void mainWithUninstallAppArgDoesNotThrow() {
-        try {
-            TaskNotificationLauncher.main(new String[] {"--uninstall-app"});
-        } catch (Exception exception) {
-            throw new AssertionError("main(--uninstall-app) should not throw", exception);
-        }
+        assertDoesNotThrow(() -> TaskNotificationLauncher.main(new String[] {"--uninstall-app"}));
     }
 
-    // Note: Verifies that the --disable-startup argument is handled before JavaFX launch
-    //       (i.e., the method returns early, the JVM does not crash).
+    // Note: Verifies that --uninstall-app routes to uninstallPackagedApp, which disables startup
+    //       before discovering there is no packaged directory to remove.
     @Test
-    void mainHandlesMultipleKnownArgsWithFirstMatch() {
-        // When both --disable-startup and --enable-startup are present, the first
-        // matching branch executes and the method returns early.
-        try {
-            TaskNotificationLauncher.main(new String[] {"--disable-startup", "--enable-startup"});
-        } catch (Exception exception) {
-            throw new AssertionError("main with multiple args should not throw", exception);
-        }
+    @EnabledOnOs(OS.WINDOWS)
+    void mainWithUninstallAppArgDisablesStartup() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.deleteIfExists(disabledMarker);
+
+        TaskNotificationLauncher.main(new String[] {"--uninstall-app"});
+
+        assertTrue(Files.isRegularFile(disabledMarker),
+                "--uninstall-app should disable startup on its way out");
     }
+
+    // Note: Verifies that when several known flags are present the first matching branch wins and
+    //       the later ones never run: --disable-startup must leave the marker that --enable-startup
+    //       would have deleted.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void mainHandlesMultipleKnownArgsWithFirstMatch() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.deleteIfExists(disabledMarker);
+
+        TaskNotificationLauncher.main(new String[] {"--disable-startup", "--enable-startup"});
+
+        assertTrue(Files.isRegularFile(disabledMarker),
+                "--disable-startup is checked first, so --enable-startup must not have run");
+    }
+
+    // The default branch (no known flag) is deliberately not tested: it calls Application.launch,
+    // which would start the real JavaFX toolkit and block the test run. Covering it would require
+    // splitting the flag handling out of main() in the production class.
 
     // ── main() parameter inspection ─────────────────────────────────
 

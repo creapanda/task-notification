@@ -3,7 +3,10 @@ package com.tasknotification.database;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,13 +38,15 @@ class DatabaseConnectionTest {
         }
     }
 
-    // Note: Verifies that the connection uses a valid SQLite database by executing a simple query.
+    // Note: Verifies that the connection uses a valid SQLite database by executing a simple query
+    //       and reading the value back.
     @Test
     void getConnectionCanExecuteSimpleQuery() throws Exception {
-        try (Connection connection = DatabaseConnection.getConnection()) {
-            boolean hasResult = connection.createStatement().execute("SELECT 1");
-
-            assertTrue(hasResult);
+        try (Connection connection = DatabaseConnection.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery("SELECT 1 AS value")) {
+            assertTrue(resultSet.next());
+            assertEquals(1, resultSet.getInt("value"));
         }
     }
 

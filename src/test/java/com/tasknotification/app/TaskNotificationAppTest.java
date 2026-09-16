@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskNotificationAppTest {
@@ -100,28 +101,73 @@ class TaskNotificationAppTest {
         assertEquals(String.class, method.getReturnType());
     }
 
-    // Note: Verifies that the private toLocalDate method exists with the expected signature.
-    @Test
-    void toLocalDateMethodExists() throws NoSuchMethodException {
-        Method method = TaskNotificationApp.class.getDeclaredMethod("toLocalDate", LocalDateTime.class);
-
-        assertEquals(LocalDate.class, method.getReturnType());
-    }
-
-    // Note: Verifies that the private toStartOfDay method exists with the expected signature.
-    @Test
-    void toStartOfDayMethodExists() throws NoSuchMethodException {
-        Method method = TaskNotificationApp.class.getDeclaredMethod("toStartOfDay", LocalDate.class);
-
-        assertEquals(LocalDateTime.class, method.getReturnType());
-    }
-
     // Note: Verifies that the private isBackgroundStart method exists with boolean return type.
+    //       Its body cannot be invoked here because getParameters() needs a launched JavaFX
+    //       Application, which is not available in a headless test run.
     @Test
     void isBackgroundStartMethodExists() throws NoSuchMethodException {
         Method method = TaskNotificationApp.class.getDeclaredMethod("isBackgroundStart");
 
         assertEquals(boolean.class, method.getReturnType());
+    }
+
+    // ── toLocalDate() (via reflection) ───────────────────────────────
+
+    // Note: Verifies that toLocalDate returns null when passed null, so an empty deadline leaves the
+    //       date picker blank instead of throwing.
+    @Test
+    void toLocalDateReturnsNullForNull() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Object result = invokePrivate(app, "toLocalDate",
+                new Class<?>[] {LocalDateTime.class}, (Object) null);
+
+        assertNull(result);
+    }
+
+    // Note: Verifies that toLocalDate keeps only the date part and drops the time.
+    @Test
+    void toLocalDateDropsTimePart() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Object result = invokePrivate(app, "toLocalDate",
+                new Class<?>[] {LocalDateTime.class}, LocalDateTime.of(2026, 7, 5, 14, 30));
+
+        assertEquals(LocalDate.of(2026, 7, 5), result);
+    }
+
+    // ── toStartOfDay() (via reflection) ──────────────────────────────
+
+    // Note: Verifies that toStartOfDay returns null when no date was picked.
+    @Test
+    void toStartOfDayReturnsNullForNull() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Object result = invokePrivate(app, "toStartOfDay",
+                new Class<?>[] {LocalDate.class}, (Object) null);
+
+        assertNull(result);
+    }
+
+    // Note: Verifies that toStartOfDay anchors the picked date at midnight.
+    @Test
+    void toStartOfDayReturnsMidnight() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        Object result = invokePrivate(app, "toStartOfDay",
+                new Class<?>[] {LocalDate.class}, LocalDate.of(2026, 7, 5));
+
+        assertEquals(LocalDateTime.of(2026, 7, 5, 0, 0), result);
+    }
+
+    // Note: Verifies that toLocalDate and toStartOfDay round-trip a midnight deadline unchanged.
+    @Test
+    void toStartOfDayRoundTripsWithToLocalDate() throws Exception {
+        TaskNotificationApp app = allocateApp();
+        LocalDateTime midnightDeadline = LocalDateTime.of(2026, 7, 5, 0, 0);
+
+        Object date = invokePrivate(app, "toLocalDate",
+                new Class<?>[] {LocalDateTime.class}, midnightDeadline);
+        Object roundTripped = invokePrivate(app, "toStartOfDay",
+                new Class<?>[] {LocalDate.class}, date);
+
+        assertEquals(midnightDeadline, roundTripped);
     }
 
     // ── Constants verification (via reflection) ──────────────────────
@@ -242,7 +288,7 @@ class TaskNotificationAppTest {
         LocalDate sample = LocalDate.of(2026, 1, 5);
 
         String formatted = formatter.format(sample);
-        assertTrue(formatted.startsWith("05 Jan 2026"));
+        assertEquals("05 Jan 2026", formatted);
     }
 
     // ── TaskFormData inner record verification (via reflection) ──────

@@ -8,6 +8,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -15,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskExcelExporterTest {
@@ -242,5 +244,26 @@ class TaskExcelExporterTest {
         try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(outputPath))) {
             assertEquals("", workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue());
         }
+    }
+
+    // ── export() failure path ────────────────────────────────────────
+
+    // Verify that an unwritable destination surfaces as IOException so the caller can show an error
+    @Test
+    void exportThrowsIoExceptionWhenDestinationDirectoryIsMissing() {
+        Path outputPath = temporaryDirectory.resolve("missing-folder").resolve("tasks.xlsx");
+        Task task = new Task(1, LocalDateTime.of(2026, 6, 1, 9, 0), "Test", "Task", null, false);
+
+        assertThrows(IOException.class, () -> exporter.export(List.of(task), outputPath));
+    }
+
+    // Verify that a destination that is an existing directory also surfaces as IOException
+    @Test
+    void exportThrowsIoExceptionWhenDestinationIsADirectory() throws Exception {
+        Path outputPath = temporaryDirectory.resolve("a-directory");
+        Files.createDirectory(outputPath);
+        Task task = new Task(1, LocalDateTime.of(2026, 6, 1, 9, 0), "Test", "Task", null, false);
+
+        assertThrows(IOException.class, () -> exporter.export(List.of(task), outputPath));
     }
 }

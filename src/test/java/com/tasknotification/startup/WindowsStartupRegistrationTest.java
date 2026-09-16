@@ -1,7 +1,10 @@
 package com.tasknotification.startup;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -14,8 +17,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WindowsStartupRegistrationTest {
 
-    @TempDir
-    Path temporaryDirectory;
+    // These methods write to the current user's real %APPDATA% folders, so every test runs against
+    // a snapshot that is put back afterwards.
+    private StartupStateBackup startupStateBackup;
+
+    @BeforeEach
+    void captureRealStartupState() throws Exception {
+        startupStateBackup = StartupStateBackup.capture();
+    }
+
+    @AfterEach
+    void restoreRealStartupState() throws Exception {
+        startupStateBackup.restore();
+    }
 
     // ── registerPackagedApp() basic behavior ─────────────────────────
 
@@ -36,93 +50,32 @@ class WindowsStartupRegistrationTest {
 
     // ── registerPackagedApp() in development environment ─────────────
 
-    // Note: Verifies that registerPackagedApp does not create a startup script when no packaged executable exists (development environment).
+    // Note: Verifies that registerPackagedApp leaves the startup script untouched when no packaged
+    //       executable exists next to java.home (development environment).
     @Test
-    void registerPackagedAppDoesNotCreateScriptInDevelopmentEnvironment() {
-        String appData = System.getenv("APPDATA");
-        // Skip this test if APPDATA is not set (non-Windows CI)
-        if (appData == null || appData.isBlank()) {
-            return;
-        }
+    @EnabledOnOs(OS.WINDOWS)
+    void registerPackagedAppDoesNotCreateStartupScriptInDevelopmentEnvironment() throws Exception {
+        Path startupScript = StartupStateBackup.startupScriptPath();
+        boolean existedBefore = Files.isRegularFile(startupScript);
 
         WindowsStartupRegistration.registerPackagedApp();
 
-        // In dev environment, java.home is not inside a packaged app directory,
-        // so findPackagedExecutable returns null and no script should be written.
-        // We verify by checking that the method exited early without error.
-        assertDoesNotThrow(WindowsStartupRegistration::registerPackagedApp);
+        assertEquals(existedBefore, Files.isRegularFile(startupScript),
+                "No packaged executable exists, so the startup script must not be created");
     }
 
-    // ── Startup script format verification ───────────────────────────
-
-    // Note: Verifies the expected startup script format by creating a sample and checking its structure.
-    @Test
-    void startupScriptFollowsExpectedFormat() throws Exception {
-        // This test verifies the script format that registerPackagedApp would generate.
-        // We reproduce the format logic from the source to validate the template.
-        Path fakeExe = temporaryDirectory.resolve("Task Notification.exe");
-        String executable = fakeExe.toAbsolutePath().normalize().toString();
-        String script = "@echo off\r\nstart \"\" \"" + executable + "\" --background\r\n";
-
-        Path scriptFile = temporaryDirectory.resolve("TaskNotificationApp.cmd");
-        Files.writeString(scriptFile, script, StandardCharsets.UTF_8);
-
-        String content = Files.readString(scriptFile, StandardCharsets.UTF_8);
-        assertTrue(content.startsWith("@echo off"));
-        assertTrue(content.contains("start \"\""));
-        assertTrue(content.contains("Task Notification.exe"));
-        assertTrue(content.contains("--background"));
-    }
-
-    // ── isWindows() indirect verification ────────────────────────────
-
-    // Note: Verifies that the current OS detection is consistent with the os.name system property.
-    @Test
-    void currentEnvironmentOsNameIsDetectable() {
-        String osName = System.getProperty("os.name", "");
-
-        // This test documents the OS detection approach used by isWindows()
-        assertFalse(osName.isEmpty(), "os.name system property should be available");
-    }
-
-    // ── findPackagedExecutable() indirect verification ────────────────
-
-    // Note: Verifies that java.home system property is available, which is required by findPackagedExecutable.
-    @Test
-    void javaHomeSystemPropertyIsAvailable() {
-        String javaHome = System.getProperty("java.home", "");
-
-        assertFalse(javaHome.isEmpty(), "java.home system property should be set");
-    }
-
-    // Note: Verifies that in a development environment, the packaged executable does not exist next to java.home.
+    // Note: Verifies that in a development environment the packaged executable does not exist next to java.home.
+    //       This is the precondition the other development-environment tests rely on.
     @Test
     void packagedExecutableDoesNotExistInDevelopmentEnvironment() {
         Path javaHome = Path.of(System.getProperty("java.home", ""));
         Path appDirectory = javaHome.getParent();
 
-        // In dev, there is no "Task Notification.exe" next to the JDK
         if (appDirectory != null) {
             Path packagedLauncher = appDirectory.resolve("Task Notification.exe");
             assertFalse(Files.isRegularFile(packagedLauncher),
                     "Packaged executable should not exist in development environment");
         }
-    }
-
-    // ── Edge case: APPDATA environment variable ──────────────────────
-
-    // Note: Verifies that the APPDATA environment variable check is consistent with the current OS.
-    @Test
-    void appDataEnvironmentVariableMatchesOs() {
-        String osName = System.getProperty("os.name", "").toLowerCase();
-        String appData = System.getenv("APPDATA");
-
-        if (osName.contains("win")) {
-            // On Windows, APPDATA should typically be set
-            assertTrue(appData != null && !appData.isBlank(),
-                    "APPDATA should be set on Windows");
-        }
-        // On non-Windows, APPDATA is usually null — registerPackagedApp would exit early
     }
 
     // ── enableStartup() ──────────────────────────────────────────────
@@ -152,6 +105,34 @@ class WindowsStartupRegistrationTest {
         });
     }
 
+    // Note: Verifies that enableStartup removes the disabled marker so the app is allowed to
+    //       register itself again on the next start.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void enableStartupRemovesDisabledMarker() throws Exception {
+        WindowsStartupRegistration.disableStartup();
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        assertTrue(Files.isRegularFile(disabledMarker), "disableStartup should have created the marker");
+
+        WindowsStartupRegistration.enableStartup();
+
+        assertFalse(Files.isRegularFile(disabledMarker),
+                "enableStartup should delete the disabled marker");
+    }
+
+    // Note: Verifies that enableStartup does not write a startup script when no packaged executable exists.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void enableStartupDoesNotCreateStartupScriptWithoutPackagedExecutable() throws Exception {
+        Path startupScript = StartupStateBackup.startupScriptPath();
+        Files.deleteIfExists(startupScript);
+
+        WindowsStartupRegistration.enableStartup();
+
+        assertFalse(Files.isRegularFile(startupScript),
+                "Without a packaged executable there is nothing to point the startup script at");
+    }
+
     // ── disableStartup() ─────────────────────────────────────────────
 
     // Note: Verifies that disableStartup does not throw in development environment.
@@ -160,14 +141,33 @@ class WindowsStartupRegistrationTest {
         assertDoesNotThrow(WindowsStartupRegistration::disableStartup);
     }
 
-    // Note: Verifies that disableStartup returns false on non-Windows (no APPDATA path available).
+    // Note: Verifies that disableStartup writes the disabled marker file and reports success on Windows.
     @Test
-    void disableStartupReturnsBooleanWithoutException() {
-        // disableStartup returns false when not on Windows, or true when it succeeds on Windows.
-        // This test documents that a boolean is always returned without an exception.
-        boolean result = assertDoesNotThrow(WindowsStartupRegistration::disableStartup);
-        // Result may be true or false depending on OS — we only verify no exception is thrown.
-        assertTrue(result || !result, "disableStartup must return a boolean without throwing");
+    @EnabledOnOs(OS.WINDOWS)
+    void disableStartupCreatesDisabledMarker() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.deleteIfExists(disabledMarker);
+
+        boolean result = WindowsStartupRegistration.disableStartup();
+
+        assertTrue(result, "disableStartup should succeed on Windows");
+        assertTrue(Files.isRegularFile(disabledMarker), "disableStartup should create the marker file");
+        assertEquals("disabled", Files.readString(disabledMarker, StandardCharsets.UTF_8));
+    }
+
+    // Note: Verifies that disableStartup deletes an existing startup script from the Startup folder.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void disableStartupRemovesExistingStartupScript() throws Exception {
+        Path startupScript = StartupStateBackup.startupScriptPath();
+        Files.createDirectories(startupScript.getParent());
+        Files.writeString(startupScript, "@echo off\r\nrem placeholder written by tests\r\n",
+                StandardCharsets.UTF_8);
+
+        WindowsStartupRegistration.disableStartup();
+
+        assertFalse(Files.isRegularFile(startupScript),
+                "disableStartup should delete the startup script");
     }
 
     // Note: Verifies that calling disableStartup twice does not throw.
@@ -204,6 +204,53 @@ class WindowsStartupRegistrationTest {
         boolean result = WindowsStartupRegistration.isStartupEnabled();
 
         assertFalse(result);
+    }
+
+    // Note: Verifies that the disabled marker alone is enough to report startup as not enabled.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void isStartupEnabledReturnsFalseWhenDisabledMarkerExists() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.createDirectories(disabledMarker.getParent());
+        Files.writeString(disabledMarker, "disabled", StandardCharsets.UTF_8);
+
+        assertFalse(WindowsStartupRegistration.isStartupEnabled(),
+                "The disabled marker must short-circuit isStartupEnabled");
+    }
+
+    // ── uninstallPackagedApp() ────────────────────────────────────────
+
+    // Note: Verifies that uninstallPackagedApp reports failure when the app is not running from a
+    //       packaged directory, so no folder deletion is ever scheduled in development.
+    @Test
+    void uninstallPackagedAppReturnsFalseWithoutPackagedApp() {
+        boolean result = WindowsStartupRegistration.uninstallPackagedApp();
+
+        assertFalse(result,
+                "Without a packaged app directory there is nothing to uninstall");
+    }
+
+    // Note: Verifies that uninstallPackagedApp disables startup before it gives up, so an app that
+    //       cannot delete itself at least stops launching on boot.
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void uninstallPackagedAppDisablesStartupFirst() throws Exception {
+        Path disabledMarker = StartupStateBackup.disabledMarkerPath();
+        Files.deleteIfExists(disabledMarker);
+
+        WindowsStartupRegistration.uninstallPackagedApp();
+
+        assertTrue(Files.isRegularFile(disabledMarker),
+                "uninstallPackagedApp should call disableStartup before returning");
+    }
+
+    // Note: Verifies that uninstallPackagedApp does not throw when called twice.
+    @Test
+    void uninstallPackagedAppCanBeCalledMultipleTimes() {
+        assertDoesNotThrow(() -> {
+            WindowsStartupRegistration.uninstallPackagedApp();
+            WindowsStartupRegistration.uninstallPackagedApp();
+        });
     }
 
     // ── Constant name verification (via reflection) ───────────────────

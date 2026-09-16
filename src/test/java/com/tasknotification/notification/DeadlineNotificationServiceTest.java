@@ -134,6 +134,33 @@ class DeadlineNotificationServiceTest {
         assertTrue(notifications.getFirst()[1].contains("Due later"));
     }
 
+    // Note: Verifies that a task sitting on the 12-hour boundary is announced once as a 12-hour
+    //       task, not twice. The 24-hour pass must exclude it via its isAfter(now + 12h) check.
+    @Test
+    void checkNowSendsOnlyTwelveHourNotificationAtTwelveHourBoundary() throws Exception {
+        notificationService.simulateStart();
+        taskRepository.add("Alex", "Due at boundary", LocalDateTime.now().plusHours(12), false);
+
+        notificationService.checkNow();
+
+        List<String[]> notifications = notificationService.getNotifications();
+        assertEquals(1, notifications.size(), "A boundary task must not be announced twice");
+        assertTrue(notifications.getFirst()[0].contains("12 hours"));
+    }
+
+    // Note: Verifies that a task sitting on the 24-hour boundary is still inside the outer window.
+    @Test
+    void checkNowNotifiesTaskDueAtTwentyFourHourBoundary() throws Exception {
+        notificationService.simulateStart();
+        taskRepository.add("Alex", "Due at outer edge", LocalDateTime.now().plusHours(24), false);
+
+        notificationService.checkNow();
+
+        List<String[]> notifications = notificationService.getNotifications();
+        assertEquals(1, notifications.size());
+        assertTrue(notifications.getFirst()[0].contains("24 hours"));
+    }
+
     // Note: Verifies that checkNow does not send any notification for a task due beyond 24 hours.
     @Test
     void checkNowDoesNotNotifyTaskDueBeyondTwentyFourHours() throws Exception {

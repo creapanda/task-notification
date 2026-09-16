@@ -5,8 +5,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -16,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TaskRepositoryTest {
@@ -358,5 +364,150 @@ class TaskRepositoryTest {
         List<Task> tasks = taskRepository.findCompleted();
 
         assertTrue(tasks.isEmpty());
+    }
+
+    // ── findUnfinishedDueWithin() window boundary tests ─────────────────
+
+    // Note: Inserts a task whose deadline is exactly `now` and verifies it is excluded, because the
+    //       query uses a strict lower bound (deadline > now).
+    @Test
+    void findUnfinishedDueWithinTestExcludesDeadlineExactlyAtNow() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 1, 9, 0);
+        taskRepository.add("Alex", "Due exactly now", now, false);
+
+        List<Task> tasks = taskRepository.findUnfinishedDueWithin(now, Duration.ofHours(24));
+
+        assertTrue(tasks.isEmpty(), "A deadline exactly at now is not inside the future window");
+    }
+
+    // Note: Inserts a task whose deadline is exactly at the end of the window and verifies it is
+    //       included, because the query uses an inclusive upper bound (deadline <= now + duration).
+    @Test
+    void findUnfinishedDueWithinTestIncludesDeadlineExactlyAtWindowEnd() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 1, 9, 0);
+        taskRepository.add("Alex", "Due at window end", now.plusHours(24), false);
+
+        List<Task> tasks = taskRepository.findUnfinishedDueWithin(now, Duration.ofHours(24));
+
+        assertEquals(1, tasks.size());
+        assertEquals("Due at window end", tasks.getFirst().taskDescription());
+    }
+
+    // Note: Inserts a task one second past the end of the window and verifies it is excluded.
+    @Test
+    void findUnfinishedDueWithinTestExcludesDeadlineJustPastWindowEnd() throws Exception {
+        LocalDateTime now = LocalDateTime.of(2026, 7, 1, 9, 0);
+        taskRepository.add("Alex", "Just outside", now.plusHours(24).plusSeconds(1), false);
+
+        List<Task> tasks = taskRepository.findUnfinishedDueWithin(now, Duration.ofHours(24));
+
+        assertTrue(tasks.isEmpty());
+    }
+
+    // ── findClosestUnfinished() limit tests ─────────────────────────────
+
+    // Note: Inserts two unfinished tasks and verifies a limit of 0 returns an empty list.
+    @Test
+    void findClosestUnfinishedTestLimitZero() throws Exception {
+        taskRepository.add("Alex", "First", LocalDateTime.of(2026, 7, 1, 0, 0), false);
+        taskRepository.add("Sam", "Second", LocalDateTime.of(2026, 7, 2, 0, 0), false);
+
+        List<Task> tasks = taskRepository.findClosestUnfinished(0);
+
+        assertTrue(tasks.isEmpty());
+    }
+
+    // Note: Inserts one task and verifies a limit larger than the row count returns everything.
+    @Test
+    void findClosestUnfinishedTestLimitLargerThanRowCount() throws Exception {
+        taskRepository.add("Alex", "Only task", LocalDateTime.of(2026, 7, 1, 0, 0), false);
+
+        List<Task> tasks = taskRepository.findClosestUnfinished(100);
+
+        assertEquals(1, tasks.size());
+    }
+
+    // ── update() / updateCompleted() / delete() on missing rows ─────────
+
+    // Note: Updates a task id that does not exist and verifies nothing is thrown or inserted.
+    @Test
+    void updateTestNonExistentId() throws Exception {
+        Task missingTask = new Task(9999L, LocalDateTime.of(2026, 7, 1, 9, 0),
+                "Ghost", "Ghost task", null, false);
+
+        taskRepository.update(missingTask);
+
+        assertTrue(taskRepository.findAll().isEmpty(), "Updating a missing row must not insert it");
+    }
+
+    // Note: Flags a task id that does not exist as completed and verifies nothing is thrown or inserted.
+    @Test
+    void updateCompletedTestNonExistentId() throws Exception {
+        taskRepository.updateCompleted(9999L, true);
+
+        assertTrue(taskRepository.findAll().isEmpty());
+    }
+
+    // ── add() failure branch ────────────────────────────────────────────
+
+    // Note: Uses a connection whose generated-keys result is empty to reach the failure branch of
+    //       add(), which the normal SQLite path never hits.
+    @Test
+    void addTestThrowsWhenNoGeneratedKeyIsReturned() {
+        TaskRepository repositoryWithoutKeys = new TaskRepository(
+                () -> connectionReturningNoGeneratedKeys(DriverManager.getConnection(JDBC_URL)));
+
+        SQLException exception = assertThrows(SQLException.class,
+                () -> repositoryWithoutKeys.add("Alex", "No key", null, false));
+
+        assertEquals("Creating task failed, no ID returned.", exception.getMessage());
+    }
+
+    // ── Default constructor ─────────────────────────────────────────────
+
+    // Note: Verifies the no-arg constructor can be created. It only stores a method reference, so
+    //       this does not open a connection to the real application database.
+    @Test
+    void defaultConstructorDoesNotOpenConnection() {
+        assertNotNull(new TaskRepository());
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────
+
+    // Wraps a real connection so every PreparedStatement it hands out reports no generated keys,
+    // reproducing a driver that inserts the row but returns no id.
+    private static Connection connectionReturningNoGeneratedKeys(Connection realConnection) {
+        return (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class<?>[] {Connection.class},
+                (proxy, method, args) -> {
+                    Object result = invokeOn(realConnection, method, args);
+                    return result instanceof PreparedStatement statement
+                            ? statementWithoutGeneratedKeys(statement)
+                            : result;
+                });
+    }
+
+    private static PreparedStatement statementWithoutGeneratedKeys(PreparedStatement realStatement) {
+        return (PreparedStatement) Proxy.newProxyInstance(
+                PreparedStatement.class.getClassLoader(),
+                new Class<?>[] {PreparedStatement.class},
+                (proxy, method, args) -> {
+                    if ("getGeneratedKeys".equals(method.getName())) {
+                        // An always-empty result set; it is closed together with its connection.
+                        return realStatement.getConnection()
+                                .createStatement()
+                                .executeQuery("SELECT 1 WHERE 0");
+                    }
+                    return invokeOn(realStatement, method, args);
+                });
+    }
+
+    private static Object invokeOn(Object target, Method method, Object[] args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException exception) {
+            throw exception.getCause();
+        }
     }
 }
