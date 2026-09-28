@@ -22,6 +22,10 @@ public class TaskNotificationLauncher {
             WindowsStartupRegistration.uninstallPackagedApp();
             return;
         }
+        if (Arrays.asList(args).contains("--check-installed")) {
+            System.out.println(WindowsStartupRegistration.isAppInstalled() ? "installed" : "not installed");
+            return;
+        }
 
         WindowsStartupRegistration.registerPackagedApp();
         Application.launch(TaskNotificationApp.class, args);
